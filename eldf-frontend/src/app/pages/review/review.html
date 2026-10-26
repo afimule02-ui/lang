@@ -1,0 +1,13 @@
+<div class="page-heading">
+  <div><div class="eyebrow">QUALITY · ADMIN</div><h1>{{ tr.t('Review queues') }}</h1></div>
+</div>
+
+<div class="admin-tabs">
+  @for (t of tabs; track t) {
+    <button class="filter-chip" [class.selected]="tab===t" (click)="setTab(t)">{{ tr.t(t) }}</button>
+  }
+</div>
+
+<div class="workspace-card">
+  <p class="demo-note">No items awaiting review. Submissions from contributors will appear here.</p>
+</div>

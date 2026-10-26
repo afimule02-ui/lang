@@ -1,0 +1,39 @@
+<div class="page-heading">
+  <div><div class="eyebrow">PROJECT SETUP · 01</div><h1>{{ tr.t('Speaker') }}</h1></div>
+</div>
+<section class="workspace-card">
+  <div class="form-grid">
+    @for (s of speakers; track s.speakerId; let i = $index) {
+      <fieldset class="speaker-field">
+        <legend>{{ tr.t('Speaker') }} {{ i + 1 }}</legend>
+        <label>{{ tr.t('Speaker ID') }}<input [value]="s.speakerId" readonly /></label>
+        <label>Age range *<input [(ngModel)]="s.ageRange" [name]="'age'+i" placeholder="e.g. 18–25" required /></label>
+        <label>Gender
+          <select [(ngModel)]="s.gender" [name]="'gender'+i">
+            <option value="">—</option>
+            <option>Woman</option><option>Man</option><option>Prefer not to say</option>
+          </select>
+        </label>
+        <label>Education *
+          <select [(ngModel)]="s.educationLevel" [name]="'edu'+i" required>
+            <option value="">Select</option>
+            <option>No formal schooling</option><option>Primary school</option>
+            <option>Secondary school</option><option>Bachelor's degree</option>
+            <option>Postgraduate degree</option><option>Prefer not to say</option>
+          </select>
+        </label>
+        <label>Language *<input [(ngModel)]="s.preferredLanguage" [name]="'lang'+i" required /></label>
+        <label>Region<input [(ngModel)]="s.region" [name]="'region'+i" /></label>
+        <label>Dialect<input [(ngModel)]="s.dialect" [name]="'dialect'+i" /></label>
+      </fieldset>
+    }
+  </div>
+  <label class="check-row">
+    <input type="checkbox" [(ngModel)]="consent" name="consent" />
+    <span>Consent from every participant is required before recording.</span>
+  </label>
+  @if (error) { <div class="form-error">{{ error }}</div> }
+  <div class="form-footer">
+    <button class="primary-button" (click)="submit()" [disabled]="loading">{{ tr.t('Continue') }}</button>
+  </div>
+</section>

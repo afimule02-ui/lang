@@ -1,0 +1,60 @@
+<div class="page-heading">
+  <div><div class="eyebrow">RECORDING · 03</div><h1>{{ tr.t('Audio collection') }}</h1></div>
+</div>
+
+<section class="recording-studio">
+  <div class="studio-toolbar">
+    <span class="studio-kicker">Recording Studio</span>
+  </div>
+  <div class="studio-main">
+    <div class="studio-mic-orb">
+      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg>
+    </div>
+
+    <div class="record-status" [attr.data-state]="state"
+         [class.is-recording]="state==='recording'"
+         [class.is-paused]="state==='paused'"
+         [class.is-completed]="state==='done'">
+      <span class="status-indicator"></span>
+      <span>{{ state === 'recording' ? 'Recording' : state === 'paused' ? 'Paused' : state === 'done' ? 'Completed' : 'Ready' }}</span>
+    </div>
+
+    <div class="record-clock">{{ clock_display }}</div>
+
+    @if (notice) { <p class="form-error" style="text-align:center">{{ notice }}</p> }
+
+    <div class="studio-controls">
+      <div class="studio-control-row studio-transport">
+        @if (state === 'idle') {
+          <button class="studio-record-button" (click)="startRecording()">
+            <span class="studio-record-icon"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg></span>
+            <span>Start Recording</span>
+          </button>
+        }
+        @if (state === 'recording') {
+          <button class="studio-control-button" (click)="pause()">Pause</button>
+          <button class="studio-control-button" (click)="stop()">Stop</button>
+        }
+        @if (state === 'paused') {
+          <button class="studio-control-button" (click)="resume()">Resume</button>
+          <button class="studio-control-button" (click)="stop()">Stop</button>
+        }
+      </div>
+    </div>
+
+    @if (state === 'done' && audioUrl) {
+      <div class="studio-player">
+        <strong>Completed recording</strong>
+        <audio controls [src]="audioUrl"></audio>
+        <div class="studio-footer">
+          <button class="primary-button" (click)="proceed()">Write transcription →</button>
+        </div>
+      </div>
+    }
+
+    <div class="studio-file">
+      <label>Or upload an audio file (WAV, MP3, M4A, OGG)</label>
+      <input type="file" accept=".wav,.mp3,.m4a,.ogg" (change)="onFile($event)" />
+    </div>
+  </div>
+</section>

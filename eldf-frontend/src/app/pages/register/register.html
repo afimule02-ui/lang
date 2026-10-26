@@ -1,0 +1,65 @@
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">CONTRIBUTOR</div>
+    <h1>{{ tr.t('Create contributor account') }}</h1>
+    <p>{{ tr.t('Build your profile and contribute to language datasets.') }}</p>
+  </div>
+</div>
+
+<form class="workspace-card form-card" (ngSubmit)="submit()">
+  <div class="form-grid">
+    <div class="field">
+      <label>{{ tr.t('Full name') }} *</label>
+      <input [(ngModel)]="name" name="name" required />
+    </div>
+    <div class="field">
+      <label>{{ tr.t('Phone number') }} *</label>
+      <div class="phone-field">
+        <span>+251</span>
+        <input [(ngModel)]="phone" name="phone" placeholder="9XX XXX XXX" required />
+      </div>
+    </div>
+    <div class="field">
+      <label>{{ tr.t('Password') }} *</label>
+      <input type="password" [(ngModel)]="password" name="password" minlength="10" required />
+      <small>At least 10 characters</small>
+    </div>
+    <div class="field">
+      <label>{{ tr.t('Preferred interface language') }}</label>
+      <select [(ngModel)]="language" name="language">
+        <option value="am">አማርኛ</option>
+        <option value="en">English</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="field">
+    <label>{{ tr.t('Agent referral link or code') }}</label>
+    <input [(ngModel)]="referralCode" name="referral_code" />
+  </div>
+  <div class="field">
+    <label>{{ tr.t('Staff invitation code (if you have one)') }}</label>
+    <input type="password" [(ngModel)]="staffCode" name="staff_code" />
+  </div>
+
+  <section class="consent-box">
+    <h3>Terms &amp; Consent</h3>
+    <label class="check-row">
+      <input type="checkbox" [(ngModel)]="terms" name="terms" />
+      <span>{{ tr.t('I agree to the Terms and Conditions and Privacy Notice.') }}</span>
+    </label>
+    <label class="check-row">
+      <input type="checkbox" [(ngModel)]="consent" name="consent" />
+      <span>{{ tr.t('I understand and consent to the audio recording and use described for this project.') }}</span>
+    </label>
+  </section>
+
+  @if (error) {
+    <div class="form-error">{{ error }}</div>
+  }
+
+  <div class="form-footer">
+    <button class="primary-button" [disabled]="loading">{{ tr.t('Register') }}</button>
+    <a routerLink="/login/contributor" class="text-button">Already have an account?</a>
+  </div>
+</form>

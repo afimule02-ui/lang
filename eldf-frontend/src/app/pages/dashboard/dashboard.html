@@ -1,0 +1,20 @@
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">CONTRIBUTOR · DEMO</div>
+    <h1>{{ tr.t('Welcome back') }}{{ user ? ', ' + user.name : '' }}</h1>
+    <p>{{ tr.t('Your own tasks and contributions') }}</p>
+  </div>
+  <a routerLink="/record" class="primary-button">{{ tr.t('Start recording') }}</a>
+</div>
+
+<div class="metrics-grid">
+  <div class="metric-card"><span>{{ tr.t('My tasks') }}</span><strong>0</strong></div>
+  <div class="metric-card"><span>{{ tr.t('Awaiting review') }}</span><strong>0</strong></div>
+  <div class="metric-card"><span>{{ tr.t('Approved') }}</span><strong>0</strong></div>
+  <div class="metric-card"><span>{{ tr.t('Returned') }}</span><strong>0</strong></div>
+</div>
+
+<section class="workspace-card">
+  <h2>{{ tr.t('My submissions') }}</h2>
+  <p class="demo-note">No submissions yet. <a routerLink="/record">Start recording</a> to contribute.</p>
+</section>

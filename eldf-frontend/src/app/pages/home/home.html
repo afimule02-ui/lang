@@ -1,0 +1,40 @@
+<section class="welcome-hero">
+  <div>
+    <div class="eyebrow">ETHIOPIA · COMMUNITY · LANGUAGES</div>
+    <h1>{{ tr.t('Ethiopian Languages Data Factory') }}</h1>
+    <p>{{ tr.t('Collect, transcribe, translate, and review speech together.') }}</p>
+  </div>
+  <div class="hero-art"><b>አ</b><i>◌</i><span>✳</span></div>
+</section>
+
+<div class="entry-grid">
+  <section class="entry-card">
+    <span class="eyebrow">{{ tr.t('Contributor') }}</span>
+    <h2>{{ tr.t('Build your profile and contribute to language datasets.') }}</h2>
+    <div class="entry-actions">
+      <a routerLink="/login/contributor" class="primary-button">{{ tr.t('Sign in as contributor') }}</a>
+      <a routerLink="/register" class="secondary-button">{{ tr.t('Create contributor account') }}</a>
+    </div>
+  </section>
+
+  <section class="entry-card admin-entry">
+    <span class="eyebrow">{{ tr.t('Administrator') }}</span>
+    <h2>{{ tr.t('Management dashboard') }}</h2>
+    <a routerLink="/login/admin" class="secondary-button">{{ tr.t('Administrator sign-in') }}</a>
+  </section>
+
+  <section class="entry-card">
+    <span class="eyebrow">{{ tr.t('Agent / focal person') }}</span>
+    <h2>{{ tr.t('Support a contributor team') }}</h2>
+    <a routerLink="/login/agent" class="secondary-button">{{ tr.t('Agent sign-in') }}</a>
+  </section>
+</div>
+
+<section class="panel">
+  <h3>{{ tr.t('Language catalog') }}</h3>
+  <div class="language-chip-list">
+    @for (lang of languages; track lang) {
+      <span class="language-chip">{{ tr.t(lang) }}</span>
+    }
+  </div>
+</section>

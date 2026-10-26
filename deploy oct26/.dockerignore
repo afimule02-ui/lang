@@ -1,0 +1,13 @@
+.git
+.env
+*.zip
+server/
+outputs/
+work/
+Eldf.Api/bin/
+Eldf.Api/obj/
+__pycache__/
+*.py[cod]
+eldf-server-data/
+server-data/
+deploy oct26/

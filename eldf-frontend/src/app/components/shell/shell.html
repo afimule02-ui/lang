@@ -1,0 +1,83 @@
+<div class="app-frame">
+  <aside class="sidebar" [class.open]="sidebarOpen">
+    <a class="brand" routerLink="/">
+      <span class="brand-mark">
+        <svg viewBox="0 0 48 48"><path d="M8 28c4-10 8 10 12 0s8-10 12 0 8 10 12 0"/><path d="M24 5 41 15v18L24 43 7 33V15z"/></svg>
+        <b>አ</b>
+      </span>
+      <span class="brand-copy">
+        <strong>language<span>factory</span></strong>
+        <small>ETHIOPIAN LANGUAGES</small>
+      </span>
+    </a>
+
+    <div class="workspace-label">{{ tr.t('WORKSPACE') }} <i></i></div>
+
+    <nav class="primary-nav">
+      <a routerLink="/" routerLinkActive="active" [routerLinkActiveOptions]="{exact:true}" class="nav-link">⌂ {{ tr.t('Overview') }}</a>
+      <a routerLink="/catalog" routerLinkActive="active" class="nav-link">▦ {{ tr.t('Language catalog') }}</a>
+
+      @if (user) {
+        @if (user.role === 'admin') {
+          <div class="nav-group-label">{{ tr.t('Administration') }}</div>
+          <a routerLink="/admin" routerLinkActive="active" class="nav-link">▤ {{ tr.t('Administration') }}</a>
+          <a routerLink="/review" routerLinkActive="active" class="nav-link">✓ {{ tr.t('Review queues') }}</a>
+        } @else if (user.role === 'agent') {
+          <div class="nav-group-label">{{ tr.t('Agent / focal person') }}</div>
+          <a routerLink="/agent" routerLinkActive="active" class="nav-link">♙ {{ tr.t('Agent workspace') }}</a>
+          <a routerLink="/review" routerLinkActive="active" class="nav-link">✓ {{ tr.t('Review queues') }}</a>
+        } @else {
+          <div class="nav-group-label">{{ tr.t('Contributor') }}</div>
+          <a routerLink="/project" routerLinkActive="active" class="nav-link">◫ {{ tr.t('Choose a project') }}</a>
+          <a routerLink="/speakers" routerLinkActive="active" class="nav-link">♙ {{ tr.t('Speaker') }}</a>
+          <a routerLink="/prepare" routerLinkActive="active" class="nav-link">✳ {{ tr.t('Before you record') }}</a>
+          <a routerLink="/record" routerLinkActive="active" class="nav-link">◉ {{ tr.t('Audio collection') }}</a>
+          <a routerLink="/transcription" routerLinkActive="active" class="nav-link">≋ {{ tr.t('Transcription') }}</a>
+          <a routerLink="/translation" routerLinkActive="active" class="nav-link">⇄ {{ tr.t('Translation') }}</a>
+          <a routerLink="/dashboard" routerLinkActive="active" class="nav-link">☷ {{ tr.t('My tasks') }}</a>
+        }
+      }
+    </nav>
+
+    <div class="sidebar-bottom">
+      <div class="demo-mini">
+        <b>✳ {{ tr.t('A home for every Ethiopian voice') }}</b>
+        <p>{{ tr.t('Demo only') }}</p>
+      </div>
+      @if (user) {
+        <button class="profile-mini" (click)="logout()">
+          <span class="avatar">{{ initials }}</span>
+          <span>
+            <b>{{ user.name }}</b>
+            <small>{{ tr.t(user.role === 'admin' ? 'Administrator' : user.role === 'agent' ? 'Agent / focal person' : 'Contributor') }}</small>
+          </span>
+          <span>↪</span>
+        </button>
+      }
+    </div>
+  </aside>
+
+  <div class="main-column">
+    <header class="topbar">
+      <button class="mobile-menu" (click)="sidebarOpen = !sidebarOpen">☰</button>
+      <div class="top-tools">
+        <div class="switch">
+          <button [class.on]="lang === 'am'" (click)="setLang('am')">አማርኛ</button>
+          <span>|</span>
+          <button [class.on]="lang === 'en'" (click)="setLang('en')">English</button>
+        </div>
+        <span class="demo-badge">{{ tr.t('Demo data') }}</span>
+      </div>
+    </header>
+
+    <main class="content">
+      <router-outlet />
+    </main>
+
+    <footer class="page-footer">
+      <span>{{ tr.t('A home for every Ethiopian voice') }} <b>♥</b></span>
+    </footer>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status"></div>

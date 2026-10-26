@@ -1,0 +1,55 @@
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">ADMINISTRATOR · DEMO</div>
+    <h1>{{ tr.t('Management dashboard') }}</h1>
+  </div>
+  <a routerLink="/review" class="secondary-button">{{ tr.t('Review queues') }}</a>
+</div>
+
+<div class="demo-callout warning">
+  Admin dashboard — server-backed data. Review queues and dataset export are available via the sidebar.
+</div>
+
+<div class="admin-tabs">
+  <button class="filter-chip" [class.selected]="tab==='overview'" (click)="tab='overview'">Overview</button>
+  <button class="filter-chip" [class.selected]="tab==='users'" (click)="tab='users'">{{ tr.t('Users') }}</button>
+  <button class="filter-chip" [class.selected]="tab==='finance'" (click)="tab='finance'">Finance</button>
+  <button class="filter-chip" [class.selected]="tab==='events'" (click)="tab='events'">Events</button>
+</div>
+
+@if (tab === 'overview') {
+  <div class="metrics-grid">
+    <div class="metric-card"><span>{{ tr.t('Users') }}</span><strong>—</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Pending reviews') }}</span><strong>—</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Approved items') }}</span><strong>—</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Returned items') }}</span><strong>—</strong></div>
+  </div>
+  <section class="workspace-card">
+    <h2>Quick links</h2>
+    <div class="entry-actions" style="gap:10px;display:flex;flex-wrap:wrap;margin-top:12px">
+      <a routerLink="/review" class="secondary-button">{{ tr.t('Review queues') }}</a>
+      <a routerLink="/catalog" class="secondary-button">{{ tr.t('Language catalog') }}</a>
+    </div>
+  </section>
+}
+
+@if (tab === 'users') {
+  <section class="workspace-card">
+    <h2>{{ tr.t('Users') }}</h2>
+    <p class="demo-note">User management requires a connected backend endpoint. Seed users are available in the database.</p>
+  </section>
+}
+
+@if (tab === 'finance') {
+  <section class="workspace-card">
+    <h2>Finance</h2>
+    <p class="demo-note">Payment and earnings tracking — connect the finance endpoints to populate this view.</p>
+  </section>
+}
+
+@if (tab === 'events') {
+  <section class="workspace-card">
+    <h2>Event log</h2>
+    <p class="demo-note">No events recorded yet.</p>
+  </section>
+}

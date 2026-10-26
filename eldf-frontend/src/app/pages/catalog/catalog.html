@@ -1,0 +1,22 @@
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">DATASETS</div>
+    <h1>{{ tr.t('Language catalog') }}</h1>
+    <p>{{ tr.t('Explore Ethiopian language collections.') }}</p>
+  </div>
+</div>
+
+<div class="catalog-grid">
+  @for (p of projects; track p.id) {
+    <article class="language-card">
+      <div class="language-card-head">
+        <span class="language-symbol">{{ p.name[0] }}</span>
+        <span class="tag">{{ tr.t('Demo data') }}</span>
+      </div>
+      <h3>{{ tr.t(p.name) }}</h3>
+      <p>{{ p.id }} · {{ p.progress }}% {{ tr.t('Your progress') }}</p>
+      <div class="progress-track"><i [style.width.%]="p.progress"></i></div>
+      <a routerLink="/project" class="text-button">{{ tr.t('Open') }} →</a>
+    </article>
+  }
+</div>

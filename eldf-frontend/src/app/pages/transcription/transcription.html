@@ -1,0 +1,16 @@
+<div class="page-heading">
+  <div><div class="eyebrow">CONTRIBUTE · 04</div><h1>{{ tr.t('Transcription') }}</h1></div>
+</div>
+<section class="workspace-card">
+  <p>{{ tr.t('Preserve the original spoken words. Do not guess. Mark unclear speech.') }}</p>
+  <div class="field">
+    <label>{{ tr.t('Transcript') }}</label>
+    <textarea [(ngModel)]="transcript" name="transcript" rows="10"
+      placeholder="Type what you hear in the original script..."></textarea>
+  </div>
+  <div class="form-footer">
+    <button class="primary-button" (click)="next()" [disabled]="!transcript.trim()">
+      {{ tr.t('Continue') }} →
+    </button>
+  </div>
+</section>

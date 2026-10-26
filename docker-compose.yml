@@ -1,0 +1,16 @@
+services:
+  eldf:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      ELDF_URLS: http://0.0.0.0:8001
+      ELDF_DATA_DIR: /data
+    ports:
+      - "8001:8001"
+    volumes:
+      - eldf-data:/data
+
+volumes:
+  eldf-data:

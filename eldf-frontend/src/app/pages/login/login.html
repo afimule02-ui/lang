@@ -1,0 +1,30 @@
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">{{ role.toUpperCase() }}</div>
+    <h1>{{ tr.t(role === 'admin' ? 'Administrator sign-in' : role === 'agent' ? 'Agent sign-in' : 'Sign in as contributor') }}</h1>
+    <p>{{ tr.t('Sign in with your server account.') }}</p>
+  </div>
+</div>
+
+<form class="workspace-card auth-card" (ngSubmit)="submit()">
+  <div class="field">
+    <label>{{ tr.t('Phone number') }}</label>
+    <div class="phone-field">
+      <span>+251</span>
+      <input [(ngModel)]="phone" name="phone" placeholder="9XX XXX XXX" required />
+    </div>
+  </div>
+  <div class="field">
+    <label>{{ tr.t('Password') }}</label>
+    <input type="password" [(ngModel)]="password" name="password" required />
+  </div>
+  @if (error) {
+    <div class="form-error">{{ error }}</div>
+  }
+  <div class="form-footer">
+    <button class="primary-button" [disabled]="loading">{{ tr.t('Continue') }}</button>
+    @if (role === 'contributor') {
+      <a routerLink="/register" class="text-button">{{ tr.t('Create contributor account') }}</a>
+    }
+  </div>
+</form>
