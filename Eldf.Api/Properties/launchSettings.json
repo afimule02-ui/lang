@@ -5,9 +5,11 @@
       "commandName": "Project",
       "dotnetRunMessages": true,
       "launchBrowser": false,
-      "applicationUrl": "http://localhost:8001",
+      "applicationUrl": "http://localhost:8002",
       "environmentVariables": {
-        "ASPNETCORE_ENVIRONMENT": "Development"
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ELDF_URLS": "http://localhost:8002",
+        "ELDF_DATA_DIR": "App_Data"
       }
     }
   }

@@ -34,7 +34,7 @@ Install the .NET 8 SDK, then open `EthiopianLanguagesDataFactory.sln`. In Visual
 }
 ```
 
-Set **Eldf.Api** as the startup project and press **Start**. The website and API will both open at `http://localhost:8001`. Keep the connection string in User Secrets or a protected environment variable; do not put a real password in `appsettings.json`.
+Set **Eldf.Api** as the startup project and press **Start**. `Eldf.Api/Properties/launchSettings.json` binds the development server to `http://localhost:8002`, and the website and API are both served from that origin. (`Program.cs` falls back to `http://localhost:8001` when `ELDF_URLS` is not set, which is the case in Docker and in production behind the reverse proxy.) Keep the connection string in User Secrets or a protected environment variable; do not put a real password in `appsettings.json`.
 
 For local development without Visual Studio, from PowerShell run:
 
@@ -44,22 +44,24 @@ dotnet run --project Eldf.Api
 
 Configure the connection string through Visual Studio User Secrets first. To use a different database with an existing database login, the login needs permission to create the initial tables. Use a test database or take a backup before trying it against existing data.
 
-## Pre-Configured Sample Accounts & Quick Testing
+### Frontend files
 
-The platform includes seeded sample accounts matching the ASP.NET Core 8 database seed. You can sign in manually or click the **"⚡ 1-Click Sign In"** buttons directly from the login page, the topbar **"👥 Sample Users"** button, or the Home Portal Bridge:
+`index.html`, `app.js`, `styles.css`, `server-workflow.js` and `data/africa-language-catalog.json` in the repository root are the only copies you should edit. `Eldf.Api/wwwroot` is a build output: the `SyncFrontendIntoWwwroot` target in `Eldf.Api.csproj` copies the root files into it before every build, because `dotnet run` uses the project folder as the content root and therefore serves `Eldf.Api/wwwroot` rather than the linked copies under `bin`. Editing `Eldf.Api/wwwroot` directly will be overwritten.
 
-| Role | Name | Phone Number | Password | Capabilities |
-| :--- | :--- | :--- | :--- | :--- |
-| **👑 Administrator** | Abebe Girma | `911000001` (`+251911000001`) | `Admin@2026!!` | Full operations, dataset management, export JSON |
-| **🛡️ Agent / Focal Person** | Tigist Haile | `911000002` (`+251911000002`) | `Agent@2026!!` | Contributor team oversight, review queue, payment approvals |
-| **🎙️ Contributor 1** | Dawit Bekele | `911000003` (`+251911000003`) | `Contrib@2026!!` | Audio recording studio, transcription workbench, submissions |
-| **🌐 Contributor 2** | Meron Tadesse | `911000004` (`+251911000004`) | `Contrib@2026!!` | Parallel translations, dialect review, wallet balance |
+## Creating the first administrator and agent accounts
 
-### ⚡ 1-Click Sample Contributor Registration
-To test the registration workflow without manual typing:
-1. Navigate to the **Create contributor account** page (`register`).
-2. Click **"⚡ Auto-fill Sample Data"** to automatically generate a unique Ethiopian phone number and test name with verified consents.
-3. Or click **"🚀 1-Click Register & Launch"** to automatically create the account in SQL Server and immediately enter the recording workspace.
+There is **no database seeding and there are no pre-created accounts.** Every account, including the first administrator, is created through `POST /api/auth/register`. The server decides the role in `StaffRole()` (`Program.cs`): a registration becomes `admin` or `agent` only when the submitted phone number is on the matching allowlist **and** the `staff_code` field matches the matching enrollment token. Anything else becomes a `contributor`.
+
+Set these environment variables before starting the API, then register through the normal **Create contributor account** form with the staff invitation code filled in:
+
+| Variable | Purpose |
+| :--- | :--- |
+| `ELDF_ADMIN_PHONES` | Comma-separated normalized phone numbers allowed to enrol as admin, e.g. `+251911000001` |
+| `ELDF_ADMIN_ENROLLMENT_TOKEN` | Long random secret that must be typed into **Staff invitation code** |
+| `ELDF_AGENT_PHONES` | Comma-separated phone numbers allowed to enrol as agent |
+| `ELDF_AGENT_ENROLLMENT_TOKEN` | A different long random secret for agent enrolment |
+
+Phone numbers are normalized before comparison: a 9-digit local number is stored as `+251` + the digits, so the allowlist must use the `+251…` form. Rotate both tokens after the staff accounts exist. Once one administrator exists, further roles can be granted from the admin dashboard (`PATCH /api/admin/users/{id}`) without re-using the enrolment tokens.
 
 ## Included .NET API features
 

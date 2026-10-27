@@ -18,6 +18,41 @@ if (origins.Length == 0) origins = builder.Configuration.GetSection("AllowedOrig
 builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy.WithOrigins(origins).AllowAnyHeader().AllowAnyMethod().AllowCredentials().WithExposedHeaders("X-Audio-Duration", "X-Audio-Trimmed")));
 builder.WebHost.UseUrls(Environment.GetEnvironmentVariable("ELDF_URLS") ?? "http://localhost:8001");
 
+// Upload size limits must be raised to match Audio:MaxBytes.
+// Kestrel defaults to a 30 MB request body and multipart form parsing defaults to 128 MB, while a
+// single valid submission is a recording of 30 to 60 minutes: roughly 56 MB at 16 kHz mono and about
+// 170 MB after the server converts to 48 kHz mono. With the defaults in place Kestrel rejected every
+// real recording with "Request body too large" before the handler ever ran, so the 30-minute minimum
+// and the 250 MB ceiling could never both be satisfied.
+var configuredMaxBytes = builder.Configuration.GetValue<long>("Audio:MaxBytes", 250L * 1024 * 1024);
+// Small headroom for the multipart boundaries and the transcript/translation fields.
+var requestBodyCeiling = configuredMaxBytes + (8L * 1024 * 1024);
+builder.WebHost.ConfigureKestrel(kestrel => kestrel.Limits.MaxRequestBodySize = requestBodyCeiling);
+builder.Services.Configure<Microsoft.AspNetCore.Http.Features.FormOptions>(form =>
+{
+    form.MultipartBodyLengthLimit = requestBodyCeiling;
+    form.MultipartHeadersLengthLimit = 64 * 1024;
+    form.ValueLengthLimit = int.MaxValue;   // the transcript and translation fields allow 2,000,000 characters
+});
+
+// Mobile audio quality and standardisation pipeline. Settings come from the Audio section so a
+// buyer specification can override the delivery standard without a code change.
+builder.Services.AddSingleton(sp =>
+{
+    var c = sp.GetRequiredService<IConfiguration>();
+    var o = new AudioPipelineOptions();
+    c.GetSection("Audio").Bind(o);
+    o.FfmpegPath = c["Audio:FfmpegPath"] ?? o.FfmpegPath;
+    o.FfprobePath = c["Audio:FfprobePath"] ?? o.FfprobePath;
+    o.MinSeconds = c.GetValue("Audio:MinSeconds", o.MinSeconds);
+    o.MaxSeconds = c.GetValue("Audio:MaxSeconds", o.MaxSeconds);
+    return o;
+});
+builder.Services.AddSingleton<AudioStoragePaths>();
+builder.Services.AddSingleton<AudioPipeline>();
+builder.Services.AddSingleton<AudioProcessingQueue>();
+builder.Services.AddHostedService<AudioProcessingWorker>();
+
 var app = builder.Build();
 app.UseCors();
 app.UseDefaultFiles();
@@ -26,7 +61,7 @@ var dataDirectory = Path.GetFullPath(Environment.GetEnvironmentVariable("ELDF_DA
 Directory.CreateDirectory(dataDirectory);
 var audioDirectory = Path.Combine(dataDirectory, "recordings");
 Directory.CreateDirectory(audioDirectory);
-var maxBytes = builder.Configuration.GetValue<long>("Audio:MaxBytes", 250L * 1024 * 1024);
+var maxBytes = configuredMaxBytes;
 var minSeconds = builder.Configuration.GetValue("Audio:MinSeconds", 1800);
 var maxSeconds = builder.Configuration.GetValue("Audio:MaxSeconds", 3600);
 var ffmpegPath = builder.Configuration["Audio:FfmpegPath"] ?? "ffmpeg";
@@ -37,7 +72,7 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<EldfDbContext>();
     await db.Database.EnsureCreatedAsync();
-    await SeedAsync(db);
+    await db.Database.MigrateAsync();
 }
 
 app.MapGet("/health", () => Results.Json(new { status = "ok", service = "ELDF .NET API" }));
@@ -53,10 +88,19 @@ app.MapPost("/api/auth/register", async (HttpRequest request, EldfDbContext db) 
     if (name.Length < 2 || phone.Length < 7 || password.Length < 10) return Problem(422, "Enter your name, a valid phone number, and a password with at least 10 characters.");
     if (await db.Users.AnyAsync(x => x.Phone == phone)) return Problem(409, "An account already uses this phone number.");
     var role = StaffRole(phone, form["staff_code"].ToString());
-    var user = new UserAccount { FullName = name, Phone = phone, PasswordHash = HashPassword(password), InterfaceLanguage = language, ReferralCode = form["referral_code"].ToString().Trim(), Role = role };
+    var suppliedReferral = NormalizeReferralCode(form["referral_code"].ToString());
+    AgentReferral? referrer = null;
+    if (suppliedReferral.Length > 0 && role == "contributor")
+    {
+        referrer = await db.AgentReferrals.Include(x => x.Agent).SingleOrDefaultAsync(x => x.Code == suppliedReferral && x.Agent.Role == "agent" && x.Agent.IsActive);
+        if (referrer is null) return Problem(422, "That agent referral link or code is not valid.");
+    }
+    var user = new UserAccount { FullName = name, Phone = phone, PasswordHash = HashPassword(password), InterfaceLanguage = language, ReferredByAgentId = referrer?.AgentUserId, Role = role };
     db.Users.Add(user);
     try { await db.SaveChangesAsync(); }
     catch (DbUpdateException) { return Problem(409, "An account already uses this phone number."); }
+    if (role == "agent") await AgentReferralCodes.EnsureAsync(db, user);
+    await WorkflowEvents.RecordAsync(db, user, "Account registered", "User", user.Id.ToString(), role);
     await IssueSession(db, user, request, app);
     return Results.Json(new { user = View(user) });
 });
@@ -66,14 +110,14 @@ app.MapPost("/api/auth/login", async (HttpRequest request, EldfDbContext db) =>
     var form = await request.ReadFormAsync();
     var phone = NormalizePhone(form["phone"].ToString());
     var user = await db.Users.SingleOrDefaultAsync(x => x.Phone == phone);
-    if (user is null || !VerifyPassword(form["password"].ToString(), user.PasswordHash)) return Problem(401, "Phone number or password is incorrect.");
+    if (user is null || !user.IsActive || !VerifyPassword(form["password"].ToString(), user.PasswordHash)) return Problem(401, "Phone number or password is incorrect.");
     await IssueSession(db, user, request, app);
     return Results.Json(new { user = View(user) });
 });
 
 app.MapGet("/api/auth/me", async (HttpRequest request, EldfDbContext db) =>
 {
-    var user = await CurrentUser(request, db);
+    var user = await SessionAuth.CurrentUser(request, db);
     return user is null ? Problem(401, "Please sign in to continue.") : Results.Json(new { user = View(user) });
 });
 
@@ -92,17 +136,24 @@ app.MapPost("/api/auth/logout", async (HttpRequest request, EldfDbContext db) =>
 
 app.MapPost("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
 {
-    var user = await CurrentUser(request, db);
+    var user = await SessionAuth.CurrentUser(request, db);
     if (user is null) return Problem(401, "Please sign in to continue.");
     using var payload = await JsonDocument.ParseAsync(request.Body);
     if (!payload.RootElement.TryGetProperty("speakers", out var list) || list.ValueKind != JsonValueKind.Array || list.GetArrayLength() < 2)
         return Problem(422, "At least two speaker profiles are required.");
     var entries = JsonSerializer.Deserialize<List<SpeakerInput>>(list.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
-    db.Speakers.RemoveRange(db.Speakers.Where(x => x.UserAccountId == user.Id));
+    var existing = await db.Speakers.Where(x => x.UserAccountId == user.Id).ToListAsync();
     for (var i = 0; i < entries.Count; i++)
     {
         var entry = entries[i];
-        db.Speakers.Add(new SpeakerProfile { UserAccountId = user.Id, SpeakerId = Limit(entry.speakerId, 40, $"SPK-{i + 1:000}"), AgeRange = Limit(entry.ageRange, 40), Gender = Limit(entry.gender, 40), Education = Limit(entry.educationLevel, 100), Language = Limit(entry.preferredLanguage, 160), Region = Limit(entry.region, 160), Dialect = Limit(entry.dialect, 160) });
+        var speakerId = Limit(entry.speakerId, 40, $"SPK-{i + 1:000}");
+        var speaker = existing.FirstOrDefault(x => x.SpeakerId == speakerId);
+        if (speaker is null) { speaker = new SpeakerProfile { UserAccountId = user.Id, SpeakerId = speakerId }; db.Speakers.Add(speaker); }
+        speaker.FullName = Limit(entry.name, 160, speaker.FullName);
+        speaker.AgeRange = Limit(entry.ageRange, 40); speaker.Gender = Limit(entry.gender, 40); speaker.Education = Limit(entry.educationLevel, 100);
+        speaker.Language = Limit(entry.preferredLanguage, 160); speaker.Region = Limit(entry.region, 160);
+        // The form stopped asking for a dialect; keep whatever an older client still sends.
+        speaker.Dialect = Limit(entry.dialect, 160, speaker.Dialect);
     }
     await db.SaveChangesAsync();
     return Results.Json(new { ok = true, count = entries.Count });
@@ -110,7 +161,7 @@ app.MapPost("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
 
 app.MapPost("/api/submissions", async (HttpRequest request, EldfDbContext db) =>
 {
-    var user = await CurrentUser(request, db);
+    var user = await SessionAuth.CurrentUser(request, db);
     if (user is null) return Problem(401, "Please sign in to continue.");
     var form = await request.ReadFormAsync();
     var file = form.Files.GetFile("file");
@@ -132,10 +183,20 @@ app.MapPost("/api/submissions", async (HttpRequest request, EldfDbContext db) =>
         var fileName = Guid.NewGuid().ToString("N") + (new[] { ".webm", ".wav", ".ogg", ".m4a", ".mp3" }.Contains(safeExtension) ? safeExtension : ".audio");
         var targetPath = Path.Combine(userFolder, fileName);
         File.Move(tempPath, targetPath);
-        var submission = new WorkSubmission { UserAccountId = user.Id, ProjectLanguage = Limit(form["language"], 160), DurationSeconds = seconds, AudioPath = Path.GetRelativePath(dataDirectory, targetPath), Transcript = transcript, Translation = translation };
+        var submission = new WorkSubmission { UserAccountId = user.Id, AssignedAgentId = user.ReferredByAgentId, ProjectLanguage = Limit(form["language"], 160), DurationSeconds = seconds, AudioPath = Path.GetRelativePath(dataDirectory, targetPath), Transcript = transcript, Translation = translation, Status = user.ReferredByAgentId.HasValue ? "Awaiting agent review" : "Awaiting admin review", UpdatedAtUtc = DateTime.UtcNow };
         db.Submissions.Add(submission);
         await db.SaveChangesAsync();
-        return Results.Json(new { ok = true, submissionId = submission.Id, status = submission.Status, minimumSeconds = minSeconds });
+        await WorkflowEvents.RecordAsync(db, user, "Work submitted", "Submission", submission.Id.ToString(), submission.ProjectLanguage);
+
+        // Queue the quality pipeline instead of running it inline: standardising a 30 to 60
+        // minute recording takes far longer than a request should. The upload is already saved,
+        // so the contributor is never left waiting and never gets a duplicate submission.
+        var queue = request.HttpContext.RequestServices.GetRequiredService<AudioProcessingQueue>();
+        db.AudioProcessing.Add(new AudioProcessingRecord { SubmissionId = submission.Id, Status = "queued" });
+        await db.SaveChangesAsync();
+        await queue.EnqueueAsync(submission.Id);
+
+        return Results.Json(new { ok = true, submissionId = submission.Id, status = submission.Status, minimumSeconds = minSeconds, audioQuality = "queued" });
     }
     catch (InvalidOperationException ex) { return Problem(422, ex.Message); }
     finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
@@ -143,7 +204,7 @@ app.MapPost("/api/submissions", async (HttpRequest request, EldfDbContext db) =>
 
 app.MapDelete("/api/submissions/{id:int}", async (int id, HttpRequest request, EldfDbContext db) =>
 {
-    var user = await CurrentUser(request, db);
+    var user = await SessionAuth.CurrentUser(request, db);
     if (user is null) return Problem(401, "Please sign in to continue.");
     var submission = await db.Submissions.SingleOrDefaultAsync(x => x.Id == id && (x.UserAccountId == user.Id || user.Role == "admin"));
     if (submission is null) return Problem(404, "Recording was not found.");
@@ -180,43 +241,14 @@ app.MapPost("/api/audio/process", async (HttpRequest request) =>
     finally { if (Directory.Exists(tempDirectory)) Directory.Delete(tempDirectory, true); }
 });
 
+app.MapWorkflowApi();
+
+// Unknown /api routes must answer with JSON 404, not the SPA shell. Serving index.html with HTTP 200
+// for a missing endpoint made the frontend treat a routing mistake as a successful response.
+app.MapFallback("/api/{*rest}", () => Results.Json(new { detail = "This API endpoint does not exist." }, statusCode: 404));
 app.MapFallbackToFile("index.html");
 
 app.Run();
-
-static async Task SeedAsync(EldfDbContext db)
-{
-    if (await db.Users.AnyAsync()) return;
-
-    var users = new[]
-    {
-        new UserAccount { FullName = "Abebe Girma",   Phone = "+251911000001", Role = "admin",       InterfaceLanguage = "am", ReferralCode = "",       PasswordHash = HashPassword("Admin@2026!!") },
-        new UserAccount { FullName = "Tigist Haile",  Phone = "+251911000002", Role = "agent",       InterfaceLanguage = "am", ReferralCode = "",       PasswordHash = HashPassword("Agent@2026!!") },
-        new UserAccount { FullName = "Dawit Bekele",  Phone = "+251911000003", Role = "contributor", InterfaceLanguage = "am", ReferralCode = "REF-001", PasswordHash = HashPassword("Contrib@2026!!") },
-        new UserAccount { FullName = "Meron Tadesse", Phone = "+251911000004", Role = "contributor", InterfaceLanguage = "en", ReferralCode = "REF-001", PasswordHash = HashPassword("Contrib@2026!!") },
-    };
-    db.Users.AddRange(users);
-    await db.SaveChangesAsync();
-
-    // Speakers for each contributor (minimum 2 required)
-    var speakerData = new[]
-    {
-        new SpeakerProfile { UserAccountId = users[2].Id, SpeakerId = "SPK-001", AgeRange = "25-34", Gender = "Male",   Education = "Bachelor",      Language = "Amharic", Region = "Addis Ababa", Dialect = "Central" },
-        new SpeakerProfile { UserAccountId = users[2].Id, SpeakerId = "SPK-002", AgeRange = "35-44", Gender = "Female", Education = "High School",   Language = "Amharic", Region = "Oromia",      Dialect = "Northern" },
-        new SpeakerProfile { UserAccountId = users[3].Id, SpeakerId = "SPK-001", AgeRange = "18-24", Gender = "Female", Education = "Master",        Language = "Amharic", Region = "Tigray",      Dialect = "Eastern"  },
-        new SpeakerProfile { UserAccountId = users[3].Id, SpeakerId = "SPK-002", AgeRange = "45-54", Gender = "Male",   Education = "PhD",           Language = "Amharic", Region = "SNNPR",       Dialect = "Southern" },
-    };
-    db.Speakers.AddRange(speakerData);
-
-    // Sample submissions (audio path is a placeholder — no real file)
-    var submissions = new[]
-    {
-        new WorkSubmission { UserAccountId = users[2].Id, ProjectLanguage = "Amharic", DurationSeconds = 1920, AudioPath = "recordings/sample/dawit_session1.wav",  Transcript = "ይህ የናሙና ጽሑፍ ነው።",   Translation = "This is a sample transcript.",  Status = "Awaiting review", CreatedAtUtc = DateTime.UtcNow.AddDays(-3) },
-        new WorkSubmission { UserAccountId = users[3].Id, ProjectLanguage = "Amharic", DurationSeconds = 2100, AudioPath = "recordings/sample/meron_session1.wav",  Transcript = "ሌላ የናሙና ጽሑፍ።",     Translation = "Another sample transcript.",   Status = "Awaiting review", CreatedAtUtc = DateTime.UtcNow.AddDays(-1) },
-    };
-    db.Submissions.AddRange(submissions);
-    await db.SaveChangesAsync();
-}
 
 static IResult Problem(int status, string detail) => Results.Json(new { detail }, statusCode: status);
 static string NormalizePhone(string phone)
@@ -264,13 +296,11 @@ static async Task IssueSession(EldfDbContext db, UserAccount user, HttpRequest r
     var isHttps = request.IsHttps || string.Equals(Environment.GetEnvironmentVariable("ELDF_COOKIE_SECURE"), "true", StringComparison.OrdinalIgnoreCase) || app.Configuration.GetValue("Cookies:Secure", false);
     request.HttpContext.Response.Cookies.Append("eldf_session", token, new CookieOptions { HttpOnly = true, Secure = isHttps, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromDays(14), Path = "/" });
 }
-static async Task<UserAccount?> CurrentUser(HttpRequest request, EldfDbContext db)
+static string NormalizeReferralCode(string value)
 {
-    var token = request.Cookies["eldf_session"];
-    if (string.IsNullOrWhiteSpace(token)) return null;
-    var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
-    var session = await db.Sessions.Include(x => x.User).SingleOrDefaultAsync(x => x.TokenHash == hash && x.ExpiresAtUtc > DateTime.UtcNow);
-    return session?.User;
+    value = value.Trim();
+    if (Uri.TryCreate(value, UriKind.Absolute, out var uri)) value = Microsoft.AspNetCore.WebUtilities.QueryHelpers.ParseQuery(uri.Query)["ref"].ToString();
+    return value.Trim().ToLowerInvariant();
 }
 static async Task<int> GetAudioDuration(string file, string ffprobePath)
 {

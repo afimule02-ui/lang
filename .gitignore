@@ -1,0 +1,27 @@
+**/bin/
+**/obj/
+Eldf.Api/appsettings.Development.json
+Eldf.Api/App_Data/
+
+# Secrets. `deploy oct26/.env` currently holds the production SQL sa password and both
+# staff enrolment tokens; if it was already committed these patterns will not untrack it,
+# so the secrets still need to be rotated and the file removed from git history.
+.env
+**/.env
+!.env.example
+
+# Audio data directories. These hold contributor recordings, the standardised copies and the
+# buyer delivery packages. They are runtime data, often hundreds of megabytes, and must never
+# reach the repository.
+Eldf.Api/App_Data/
+Eldf.Api/App_Data_*/
+eldf-server-data/
+
+# Build output: Eldf.Api.csproj copies the repository-root frontend files into wwwroot
+# before every build (see the SyncFrontendIntoWwwroot target). Edit the root files.
+Eldf.Api/wwwroot/index.html
+Eldf.Api/wwwroot/app.js
+Eldf.Api/wwwroot/styles.css
+Eldf.Api/wwwroot/server-workflow.js
+Eldf.Api/wwwroot/data/africa-language-catalog.json
+Eldf.Api/wwwroot/README.md

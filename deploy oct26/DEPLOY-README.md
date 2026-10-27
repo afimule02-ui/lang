@@ -113,14 +113,22 @@ deploy oct26/
 
 ---
 
-## Sample Accounts (Pre-seeded)
+## Accounts
 
-| Name | Phone | Password | Role |
-|------|-------|----------|------|
-| Abebe Girma | +251911000001 | Admin@2026!! | admin |
-| Tigist Haile | +251911000002 | Agent@2026!! | agent |
-| Dawit Bekele | +251911000003 | Contrib@2026!! | contributor |
-| Meron Tadesse | +251911000004 | Contrib@2026!! | contributor |
+There is **no database seeding** in this project. The table that used to sit here listed four
+accounts together with their passwords and described them as pre-seeded, which was wrong on both
+counts: nothing creates them automatically, and four of those accounts were later created by hand
+with exactly the published passwords. Publishing a working password is what turned this into a
+security incident.
+
+Those passwords are removed from this file. They remain readable in commit `f2d471d`, so every
+account that used one must be given a new password. See
+`SECURITY-INCIDENT-AND-ROTATION-PLAN.md` in the repository root.
+
+To create the first administrator, set `ELDF_ADMIN_PHONES` and `ELDF_ADMIN_ENROLLMENT_TOKEN` in
+`.env`, then register through the normal form with the staff invitation code filled in. The server
+decides the role in `StaffRole()`; a registration only becomes `admin` when the phone number is on
+the allowlist **and** the token matches.
 
 ---
 
@@ -158,7 +166,7 @@ The database `LangDataPlatform` will be auto-created by EF Core on first run.
 
 If SQL Server is running in Docker:
 ```bash
-docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=Sol@2026" \
+docker run -e "ACCEPT_EULA=Y" -e "MSSQL_SA_PASSWORD=<SET_IN_ENV_FILE>" \
   -p 1433:1433 --name sqlserver --restart unless-stopped \
   -d mcr.microsoft.com/mssql/server:2022-latest
 ```

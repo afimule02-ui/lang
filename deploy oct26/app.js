@@ -1426,7 +1426,7 @@ const sampleUsers = [
     name: "Abebe Girma",
     phone: "911000001",
     displayPhone: "911 000 001",
-    password: "Admin@2026!!",
+    password: "<REMOVED_SAMPLE_PASSWORD>",
     role: "admin",
     icon: "👑",
     roleEn: "Administrator (Full Operations)",
@@ -1441,7 +1441,7 @@ const sampleUsers = [
     name: "Tigist Haile",
     phone: "911000002",
     displayPhone: "911 000 002",
-    password: "Agent@2026!!",
+    password: "<REMOVED_SAMPLE_PASSWORD>",
     role: "agent",
     icon: "🛡️",
     roleEn: "Agent / Focal Person",
@@ -1456,7 +1456,7 @@ const sampleUsers = [
     name: "Dawit Bekele",
     phone: "911000003",
     displayPhone: "911 000 003",
-    password: "Contrib@2026!!",
+    password: "<REMOVED_SAMPLE_PASSWORD>",
     role: "contributor",
     icon: "🎙️",
     roleEn: "Contributor (Speech & Transcripts)",
@@ -1471,7 +1471,7 @@ const sampleUsers = [
     name: "Meron Tadesse",
     phone: "911000004",
     displayPhone: "911 000 004",
-    password: "Contrib@2026!!",
+    password: "<REMOVED_SAMPLE_PASSWORD>",
     role: "contributor",
     icon: "🌐",
     roleEn: "Contributor (Translation & Audio)",
@@ -1615,7 +1615,7 @@ function autofillRegistrationForm() {
 
   if (nameInput) nameInput.value = item.name;
   if (phoneInput) phoneInput.value = item.phone;
-  if (passInput) passInput.value = "Contrib@2026!!";
+  if (passInput) passInput.value = "<REMOVED_SAMPLE_PASSWORD>";
   if (termsBox) termsBox.checked = true;
   if (consentBox) consentBox.checked = true;
 

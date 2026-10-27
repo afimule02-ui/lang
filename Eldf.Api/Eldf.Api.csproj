@@ -9,9 +9,27 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.0" />
   </ItemGroup>
   <ItemGroup>
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
+    <Content Remove="wwwroot/index.html;wwwroot/app.js;wwwroot/styles.css;wwwroot/server-workflow.js;wwwroot/data/africa-language-catalog.json" />
     <Content Include="../index.html" Link="wwwroot/index.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../app.js" Link="wwwroot/app.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../styles.css" Link="wwwroot/styles.css" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../server-workflow.js" Link="wwwroot/server-workflow.js" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../data/africa-language-catalog.json" Link="wwwroot/data/africa-language-catalog.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!--
+    `dotnet run` uses the project folder as the content root, so the web root is Eldf.Api\wwwroot on disk
+    and NOT the linked copies under bin. Without this sync the server kept serving an older app.js and an
+    index.html that never loaded server-workflow.js, while the repository-root files were the ones edited.
+    The repository-root files are the single source of truth; wwwroot is a build output.
+  -->
+  <ItemGroup>
+    <EldfFrontendSource Include="../index.html;../app.js;../styles.css;../server-workflow.js" />
+    <EldfFrontendData Include="../data/africa-language-catalog.json" />
+  </ItemGroup>
+  <Target Name="SyncFrontendIntoWwwroot" BeforeTargets="BeforeBuild">
+    <Copy SourceFiles="@(EldfFrontendSource)" DestinationFolder="$(MSBuildProjectDirectory)/wwwroot" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(EldfFrontendData)" DestinationFolder="$(MSBuildProjectDirectory)/wwwroot/data" SkipUnchangedFiles="true" />
+  </Target>
 </Project>
