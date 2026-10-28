@@ -82,6 +82,12 @@ public sealed class AudioMeasurements
     public double LoudnessLufs { get; set; }
     public double TruePeakDb { get; set; }
     public double LoudnessRange { get; set; }
+    /// <summary>
+    /// Whether the loudness figures above come from FFmpeg or are still at their defaults.
+    /// Without this flag an unread analysis is indistinguishable from a recording that genuinely
+    /// measures 0 LUFS, and callers end up treating the default as a measurement.
+    /// </summary>
+    public bool LoudnessMeasured { get; set; }
     public long ClippedSamples { get; set; }
     public long TotalSamples { get; set; }
     public double ClippedRatio => TotalSamples > 0 ? (double)ClippedSamples / TotalSamples : 0;
@@ -243,18 +249,28 @@ public sealed class AudioPipeline(AudioPipelineOptions options, ILogger<AudioPip
             // ebur128 via loudnorm's analysis pass gives integrated loudness and true peak.
             var (_, _, lnErr) = await RunAsync(options.FfmpegPath,
                 ["-hide_banner", "-nostats", "-i", path, "-af", "loudnorm=print_format=json", "-f", "null", "-"], ct);
-            var jsonStart = lnErr.LastIndexOf('{');
-            if (jsonStart >= 0)
+            var loudnessJson = ExtractLoudnormJson(lnErr);
+            if (loudnessJson is not null)
             {
                 try
                 {
-                    using var ln = JsonDocument.Parse(lnErr[jsonStart..]);
+                    using var ln = JsonDocument.Parse(loudnessJson);
                     var r = ln.RootElement;
                     if (r.TryGetProperty("input_i", out var i)) m.LoudnessLufs = ParseDouble(i.GetString() ?? "0");
                     if (r.TryGetProperty("input_tp", out var tp)) m.TruePeakDb = ParseDouble(tp.GetString() ?? "0");
                     if (r.TryGetProperty("input_lra", out var lra)) m.LoudnessRange = ParseDouble(lra.GetString() ?? "0");
+                    m.LoudnessMeasured = true;
                 }
-                catch (JsonException) { /* the analysis block is best-effort */ }
+                catch (JsonException ex)
+                {
+                    // Visible rather than swallowed: a silent failure here used to leave the
+                    // loudness at 0, which quietly disabled the PASS verdict for every recording.
+                    log.LogWarning(ex, "Could not read the loudnorm analysis for {Path}", path);
+                }
+            }
+            else
+            {
+                log.LogWarning("FFmpeg printed no loudnorm analysis block for {Path}", path);
             }
 
             m.SilenceSpans = await DetectSilenceAsync(path, durationSeconds, ct);
@@ -270,6 +286,35 @@ public sealed class AudioPipeline(AudioPipelineOptions options, ILogger<AudioPip
             m.ReadError = ex.Message;
         }
         return m;
+    }
+
+    /// <summary>
+    /// Pulls the loudnorm analysis object out of an FFmpeg log.
+    ///
+    /// FFmpeg prints the JSON block and then carries on logging: the muxing-overhead line and the
+    /// final "size=/time=" progress line both come after it. Slicing from the opening brace to the
+    /// end of stderr therefore produced a document with trailing content, which
+    /// <see cref="JsonDocument"/> rejects. The resulting exception was swallowed, so every
+    /// recording silently reported a loudness of 0 - and because the "already at target loudness"
+    /// test compares against that value, no recording could ever reach the PASS verdict.
+    ///
+    /// The block is delimited by brace depth instead of assumed to run to the end of the output.
+    /// </summary>
+    private static string? ExtractLoudnormJson(string log)
+    {
+        // Anchor on the filter's own log prefix so an unrelated brace elsewhere is not mistaken
+        // for the start of the report.
+        var marker = log.LastIndexOf("Parsed_loudnorm", StringComparison.Ordinal);
+        var start = log.IndexOf('{', marker >= 0 ? marker : 0);
+        if (start < 0) return null;
+
+        var depth = 0;
+        for (var i = start; i < log.Length; i++)
+        {
+            if (log[i] == '{') depth++;
+            else if (log[i] == '}' && --depth == 0) return log[start..(i + 1)];
+        }
+        return null; // truncated output: no balanced object to read
     }
 
     /// <summary>
@@ -388,6 +433,14 @@ public sealed class AudioPipeline(AudioPipelineOptions options, ILogger<AudioPip
 
         return (AudioVerdict.PASS, findings, "", "");
     }
+
+    /// <summary>
+    /// Whether normalisation moved the loudness enough for the recording to count as altered.
+    /// An unmeasured loudness is not treated as a change: that is what made every recording look
+    /// altered and left the PASS verdict unreachable.
+    /// </summary>
+    private bool LoudnessWasChanged(AudioMeasurements m) =>
+        m.LoudnessMeasured && Math.Abs(m.LoudnessLufs - options.TargetLoudnessLufs) > 1;
 
     /// <summary>How far the speech peak sits above the room tone. A rough signal-to-noise margin.</summary>
     private static double SignalMarginDb(AudioMeasurements m) =>
@@ -562,7 +615,9 @@ public sealed class AudioPipeline(AudioPipelineOptions options, ILogger<AudioPip
                 report.ContributorMessage = "The audio quality could not be confirmed automatically. It has been sent for human review.";
                 report.ContributorMessageAmharic = "የድምፅ ጥራቱ በራስ-ሰር ሊረጋገጥ አልቻለም። ለሰው ግምገማ ተልኳል።";
             }
-            else if (edge || interior || denoised || Math.Abs(report.Before.LoudnessLufs - options.TargetLoudnessLufs) > 1)
+            // Loudness only counts as a change when it was actually measured. If the analysis
+            // could not be read, fall back to the repair flags rather than assuming a change.
+            else if (edge || interior || denoised || LoudnessWasChanged(report.Before))
             {
                 report.Verdict = nameof(AudioVerdict.AUTO_FIXED);
                 report.ContributorMessage = "Your audio was accepted and prepared automatically. A reviewer will confirm it.";
