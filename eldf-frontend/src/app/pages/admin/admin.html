@@ -1,14 +1,13 @@
 <div class="page-heading">
   <div>
-    <div class="eyebrow">ADMINISTRATOR · DEMO</div>
+    <div class="eyebrow">ADMINISTRATOR</div>
     <h1>{{ tr.t('Management dashboard') }}</h1>
   </div>
   <a routerLink="/review" class="secondary-button">{{ tr.t('Review queues') }}</a>
 </div>
 
-<div class="demo-callout warning">
-  Admin dashboard — server-backed data. Review queues and dataset export are available via the sidebar.
-</div>
+@if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
+@if (workspace.error()) { <p class="form-error">{{ workspace.error() }}</p> }
 
 <div class="admin-tabs">
   <button class="filter-chip" [class.selected]="tab==='overview'" (click)="tab='overview'">Overview</button>
@@ -19,10 +18,11 @@
 
 @if (tab === 'overview') {
   <div class="metrics-grid">
-    <div class="metric-card"><span>{{ tr.t('Users') }}</span><strong>—</strong></div>
-    <div class="metric-card"><span>{{ tr.t('Pending reviews') }}</span><strong>—</strong></div>
-    <div class="metric-card"><span>{{ tr.t('Approved items') }}</span><strong>—</strong></div>
-    <div class="metric-card"><span>{{ tr.t('Returned items') }}</span><strong>—</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Users') }}</span><strong>{{ workspace.data()?.users?.length ?? 0 }}</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Pending reviews') }}</span><strong>{{ workspace.data()?.report?.pendingReview ?? 0 }}</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Approved items') }}</span><strong>{{ workspace.data()?.report?.approved ?? 0 }}</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Returned items') }}</span><strong>{{ workspace.data()?.report?.returned ?? 0 }}</strong></div>
+    <div class="metric-card"><span>{{ tr.t('Collected audio hours') }}</span><strong>{{ workspace.data()?.report?.audioHours ?? 0 }}</strong></div>
   </div>
   <section class="workspace-card">
     <h2>Quick links</h2>
@@ -36,20 +36,69 @@
 @if (tab === 'users') {
   <section class="workspace-card">
     <h2>{{ tr.t('Users') }}</h2>
-    <p class="demo-note">User management requires a connected backend endpoint. Seed users are available in the database.</p>
+    @if (actionError) { <p class="form-error">{{ actionError }}</p> }
+    @for (account of workspace.data()?.users ?? []; track account.id) {
+      <div class="panel">
+        <strong>{{ account.name }}</strong> · {{ account.phone }}
+        <small class="role-badge">{{ account.role }}</small>
+        <label class="field">Role
+          <select [(ngModel)]="account.role" [disabled]="savingUserId === account.id">
+            <option value="contributor">Contributor</option><option value="agent">Agent</option><option value="admin">Admin</option>
+          </select>
+        </label>
+        @if (account.role === 'contributor') {
+          <label class="field">Assign to agent
+            <select [(ngModel)]="account.agentId" [disabled]="savingUserId === account.id">
+              <option [ngValue]="null">No agent</option>
+              @for (agent of agents; track agent.id) { <option [ngValue]="agent.id">{{ agent.name }} · {{ agent.phone }}</option> }
+            </select>
+          </label>
+        }
+        @if (account.role === 'agent' && account.referralCode) { <p>Referral code: <strong>{{ account.referralCode }}</strong></p> }
+        <label class="check-row"><input type="checkbox" [(ngModel)]="account.active" [disabled]="savingUserId === account.id" /> Active</label>
+        <button class="secondary-button" [disabled]="savingUserId === account.id" (click)="saveUser(account)">Save account</button>
+      </div>
+    } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No accounts found.</p> } }
   </section>
 }
 
 @if (tab === 'finance') {
   <section class="workspace-card">
     <h2>Finance</h2>
-    <p class="demo-note">Payment and earnings tracking — connect the finance endpoints to populate this view.</p>
+    @if (actionError) { <p class="form-error">{{ actionError }}</p> }
+    @for (payment of workspace.data()?.paymentRequests ?? []; track payment.id) {
+      <div class="panel payment-panel">
+        <div class="page-heading"><div><strong>{{ payment.userName }}</strong> · {{ payment.userPhone }}<p>{{ payment.amount | number:'1.2-2' }} {{ payment.currency }} · {{ payment.requestedAt }}</p></div><span class="status-pill pending">{{ payment.status }}</span></div>
+        @if (payment.reviewNote) { <p>{{ payment.reviewNote }}</p> }
+        @if (payment.status === 'Pending admin review' || payment.status === 'Returned by agent') {
+          <label class="field">Admin note<textarea [(ngModel)]="financeNotes[payment.id]" rows="2"></textarea></label>
+          <div class="entry-actions"><button class="primary-button" [disabled]="paymentBusyId === payment.id" (click)="decidePayment(payment, 'approve')">Approve</button><button class="danger-button" [disabled]="paymentBusyId === payment.id || !(financeNotes[payment.id] ?? '').trim()" (click)="decidePayment(payment, 'reject')">Reject</button></div>
+        }
+        @if (payment.status === 'Approved') {
+          <label class="field">Payment proof/reference<input [(ngModel)]="proofReferences[payment.id]" required /></label>
+          <button class="primary-button" [disabled]="paymentBusyId === payment.id || (proofReferences[payment.id] ?? '').trim().length < 3" (click)="decidePayment(payment, 'paid')">Mark paid</button>
+        }
+        @if (payment.proofReference) { <p>Proof: {{ payment.proofReference }}</p> }
+      </div>
+    } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No payment requests found.</p> } }
   </section>
 }
 
 @if (tab === 'events') {
   <section class="workspace-card">
     <h2>Event log</h2>
-    <p class="demo-note">No events recorded yet.</p>
+    @if (resetError) { <p class="form-error">{{ resetError }}</p> }
+    @for (event of workspace.data()?.events ?? []; track event.id) {
+      <div class="panel"><strong>{{ event.type }}</strong> · {{ event.role }} · {{ event.details }} · {{ event.createdAt }}
+        @if (event.type === 'Password reset requested') {
+          @let account = accountForReset(event);
+          @if (account) {
+            <p>Verify the caller by calling the registered number {{ account.phone }} before issuing a password.</p>
+            <button class="secondary-button" [disabled]="resetBusyId === account.id" (click)="issueResetPassword(account.id)">Issue temporary password</button>
+            @if (resetPasswords[account.id]) { <p class="reset-secret">Temporary password (show once): <strong>{{ resetPasswords[account.id] }}</strong>. Give it to the verified user by phone, then ask them to change it after signing in.</p> }
+          }
+        }
+      </div>
+    } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No activity recorded yet.</p> } }
   </section>
 }

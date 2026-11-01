@@ -1,8 +1,17 @@
+FROM node:24-alpine AS frontend-build
+WORKDIR /frontend
+COPY eldf-frontend/package.json eldf-frontend/package-lock.json ./
+RUN npm ci
+COPY eldf-frontend/ ./
+RUN npm run build
+
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 COPY Eldf.Api/Eldf.Api.csproj Eldf.Api/
 RUN dotnet restore Eldf.Api/Eldf.Api.csproj
 COPY . .
+RUN rm -rf ./Eldf.Api/wwwroot/*
+COPY --from=frontend-build /frontend/dist/eldf-frontend/browser/ ./Eldf.Api/wwwroot/
 RUN dotnet publish Eldf.Api/Eldf.Api.csproj -c Release -o /app/publish --no-restore
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime

@@ -1,15 +1,14 @@
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router } from '@angular/router';
 import { TranslateService } from '../../services/translate.service';
 import { ApiService } from '../../services/api.service';
-import { AuthService } from '../../services/auth.service';
+import { RouterLink } from '@angular/router';
+import { CaptureSessionService } from '../../services/capture-session.service';
 
-@Component({ selector: 'app-translation', standalone: true, imports: [FormsModule], templateUrl: './translation.html' })
+@Component({ selector: 'app-translation', standalone: true, imports: [FormsModule, RouterLink], templateUrl: './translation.html' })
 export class TranslationComponent implements OnInit {
   transcript = '';
   translation = '';
-  notes = '';
   error = '';
   loading = false;
   success = false;
@@ -17,12 +16,11 @@ export class TranslationComponent implements OnInit {
   constructor(
     public tr: TranslateService,
     private api: ApiService,
-    private auth: AuthService,
-    private router: Router
+    private capture: CaptureSessionService
   ) {}
 
   ngOnInit() {
-    this.transcript = sessionStorage.getItem('eldf_transcript') ?? '';
+    this.transcript = this.capture.transcript;
   }
 
   async submit() {
@@ -33,18 +31,18 @@ export class TranslationComponent implements OnInit {
     this.loading = true;
     this.error = '';
     try {
-      const audioData = sessionStorage.getItem('eldf_audio_blob');
-      if (!audioData) { this.error = 'No audio found. Please record audio first.'; return; }
+      const audio = this.capture.audio;
+      if (!audio) { this.error = 'No audio found. Please record audio first.'; return; }
+      const language = this.capture.language();
+      if (!language) { this.error = 'Choose a language project before submitting.'; return; }
       const form = new FormData();
-      const blob = await fetch(audioData).then(r => r.blob());
-      form.append('file', blob, 'recording.webm');
+      form.append('file', audio, audio.type === 'audio/wav' ? 'recording.wav' : 'recording.webm');
       form.append('transcript', this.transcript);
       form.append('translation', this.translation);
-      form.append('language', 'Amharic');
+      form.append('language', language);
       await this.api.submitAudio(form);
       this.success = true;
-      sessionStorage.removeItem('eldf_transcript');
-      sessionStorage.removeItem('eldf_audio_blob');
+      this.capture.clear();
     } catch (e: any) {
       this.error = e?.error?.detail ?? 'Submission failed.';
     } finally {

@@ -2,7 +2,7 @@
 
 Enterprise-grade, ethically sourced 3-tier datasets (Studio Audio, Verbatim Transcripts, Aligned Parallel Translations) powered by time-stamped structured JSON metadata. Optimized for ASR, Speech Translation, and LLM fine-tuning.
 
-This folder contains the complete AfriCorpus AI enterprise marketplace frontend, the Ethiopian Languages Data Factory contributor and admin workspaces, and the unified ASP.NET Core 8 (.NET) backend. The .NET app serves the public commercial marketplace, contributor recording studio, quality review tools, and REST API together on port 8001.
+This folder contains the AfriCorpus AI language collection workspace as an Angular frontend, with an ASP.NET Core 8 (.NET) backend. Its country and language catalog covers African language communities using the included Glottolog country-language map. The Angular app is compiled during the Docker build and served by the API from the same origin on port 8001.
 
 ## Deploy the ZIP on your server
 
@@ -34,19 +34,29 @@ Install the .NET 8 SDK, then open `EthiopianLanguagesDataFactory.sln`. In Visual
 }
 ```
 
-Set **Eldf.Api** as the startup project and press **Start**. `Eldf.Api/Properties/launchSettings.json` binds the development server to `http://localhost:8002`, and the website and API are both served from that origin. (`Program.cs` falls back to `http://localhost:8001` when `ELDF_URLS` is not set, which is the case in Docker and in production behind the reverse proxy.) Keep the connection string in User Secrets or a protected environment variable; do not put a real password in `appsettings.json`.
+Set **Eldf.Api** as the startup project and press **Start** to run the API on `http://localhost:8002`. Run the Angular dev server separately as described below; it serves the frontend on `http://localhost:4200` and proxies API requests to port `8002`. (`Program.cs` falls back to `http://localhost:8001` when `ELDF_URLS` is not set, which is the case in Docker and in production behind the reverse proxy.) Keep the connection string in User Secrets or a protected environment variable; do not put a real password in `appsettings.json`.
 
-For local development without Visual Studio, from PowerShell run:
+For local development without Visual Studio, first start the API in one PowerShell window:
 
 ```powershell
 dotnet run --project Eldf.Api
 ```
 
+Then start the Angular development server in a second window:
+
+```powershell
+cd eldf-frontend
+npm ci
+npm start
+```
+
+Open `http://localhost:4200`. The Angular dev proxy forwards `/api` and `/health` to the API at `http://localhost:8002`; production uses same-origin relative URLs, so no development host is baked into the frontend bundle.
+
 Configure the connection string through Visual Studio User Secrets first. To use a different database with an existing database login, the login needs permission to create the initial tables. Use a test database or take a backup before trying it against existing data.
 
 ### Frontend files
 
-`index.html`, `app.js`, `styles.css`, `server-workflow.js` and `data/africa-language-catalog.json` in the repository root are the only copies you should edit. `Eldf.Api/wwwroot` is a build output: the `SyncFrontendIntoWwwroot` target in `Eldf.Api.csproj` copies the root files into it before every build, because `dotnet run` uses the project folder as the content root and therefore serves `Eldf.Api/wwwroot` rather than the linked copies under `bin`. Editing `Eldf.Api/wwwroot` directly will be overwritten.
+The Angular source of truth is `eldf-frontend/src`. `Dockerfile` builds it with Node and copies the production bundle into `Eldf.Api/wwwroot` before `dotnet publish`. For local frontend work use `npm start` with the API running at port `8002`; the API serves the compiled frontend on port `8001` in Docker/production.
 
 ## Creating the first administrator and agent accounts
 
@@ -73,7 +83,7 @@ Phone numbers are normalized before comparison: a 9-digit local number is stored
 - Prepare audio as mono 48 kHz WAV, trim edge silence, apply mild noise filtering, and normalize it using FFmpeg.
 - Serve the frontend and `/health` from the .NET app.
 
-This is not a claim that every screen has been migrated to persistent .NET/SQL Server storage. Existing admin/agent dashboards, chat, task routing, payments, and review queues still have browser-local demo behavior and need separate backend endpoints before they are authoritative. The site does not upload to Supabase. No remote database or real microphone test was performed as part of preparing this package.
+The Angular contributor recording flow and contributor workspace use the .NET API and SQL Server for speaker profiles, drafts, submissions, and review status. Admin and agent workspaces, review decisions, account role updates, payment summaries, and activity records also use persisted API endpoints. Full Angular support-chat and payment-approval screens are not included yet. No production database, public-domain deployment, or real microphone recording was tested as part of this change.
 
 ## Important security and operational notes
 

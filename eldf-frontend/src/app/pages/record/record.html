@@ -4,57 +4,89 @@
 
 <section class="recording-studio">
   <div class="studio-toolbar">
-    <span class="studio-kicker">Recording Studio</span>
+    <span class="studio-kicker">{{ tr.t('Recording Studio') }} · {{ capture.language() || tr.t('Choose a project') }}</span>
   </div>
   <div class="studio-main">
-    <div class="studio-mic-orb">
-      <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg>
-    </div>
-
-    <div class="record-status" [attr.data-state]="state"
-         [class.is-recording]="state==='recording'"
-         [class.is-paused]="state==='paused'"
-         [class.is-completed]="state==='done'">
-      <span class="status-indicator"></span>
-      <span>{{ state === 'recording' ? 'Recording' : state === 'paused' ? 'Paused' : state === 'done' ? 'Completed' : 'Ready' }}</span>
-    </div>
-
-    <div class="record-clock">{{ clock_display }}</div>
-
-    @if (notice) { <p class="form-error" style="text-align:center">{{ notice }}</p> }
-
-    <div class="studio-controls">
-      <div class="studio-control-row studio-transport">
-        @if (state === 'idle') {
-          <button class="studio-record-button" (click)="startRecording()">
-            <span class="studio-record-icon"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg></span>
-            <span>Start Recording</span>
+    @if (state === 'testReady' || state === 'testing' || state === 'testReview') {
+      <section class="mic-test-panel">
+        <div class="studio-mic-orb"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg></div>
+        <h2>{{ tr.t('30-second microphone test') }}</h2>
+        <p>{{ tr.t('Keep quiet for the first 3 seconds, then speak naturally until the test ends.') }}</p>
+        @if (state === 'testReady') {
+          <button class="studio-record-button" (click)="startTest()">
+            <span class="studio-record-icon">●</span><span>{{ tr.t('Start microphone test') }}</span>
           </button>
         }
-        @if (state === 'recording') {
-          <button class="studio-control-button" (click)="pause()">Pause</button>
-          <button class="studio-control-button" (click)="stop()">Stop</button>
+        @if (state === 'testing') {
+          <div class="record-status is-recording"><span class="status-indicator"></span><span>{{ tr.t('Microphone test in progress') }}</span></div>
+          <div class="record-clock">{{ test_clock_display }}</div>
+          <p>{{ tr.t('Time remaining') }}</p>
         }
-        @if (state === 'paused') {
-          <button class="studio-control-button" (click)="resume()">Resume</button>
-          <button class="studio-control-button" (click)="stop()">Stop</button>
+        @if (state === 'testReview') {
+          <div class="test-feedback" role="status" aria-live="polite">
+            <h3>{{ tr.t('Microphone test results') }}</h3>
+            <ul>@for (feedback of testFeedback; track feedback) { <li>{{ tr.t(feedback) }}</li> }</ul>
+          </div>
+          @if (testAudioUrl) { <audio class="test-audio-preview" controls [src]="testAudioUrl"></audio> }
+          <div class="studio-control-row">
+            <button class="studio-control-button" (click)="retryTest()">{{ tr.t('Test again') }}</button>
+            <button class="primary-button" (click)="continueToRecording()">{{ tr.t('Continue to recording') }} →</button>
+          </div>
         }
+      </section>
+    } @else {
+      <div class="studio-mic-orb">
+        <svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg>
       </div>
-    </div>
-
-    @if (state === 'done' && audioUrl) {
-      <div class="studio-player">
-        <strong>Completed recording</strong>
-        <audio controls [src]="audioUrl"></audio>
-        <div class="studio-footer">
-          <button class="primary-button" (click)="proceed()">Write transcription →</button>
+      <div class="record-status" [attr.data-state]="state"
+           [class.is-recording]="state==='recording'"
+           [class.is-paused]="state==='paused'"
+           [class.is-completed]="state==='done'">
+        <span class="status-indicator"></span>
+        <span>{{ state === 'recording' ? tr.t('Recording') : state === 'paused' ? tr.t('Paused') : state === 'done' ? tr.t('Completed') : tr.t('Ready') }}</span>
+      </div>
+      <div class="record-clock">{{ clock_display }}</div>
+      @if (capture.topics.length) {
+        <section class="recording-topics" aria-label="{{ tr.t('Selected topics') }}">
+          <strong>{{ tr.t('Selected topics') }}</strong>
+          <div class="topic-chips">@for (topic of capture.topics; track topic) { <span class="language-chip">{{ tr.t(topic) }}</span> }</div>
+        </section>
+      }
+      @if (notice) { <p class="form-error" style="text-align:center">{{ tr.t(notice) }}</p> }
+      <div class="studio-controls">
+        <div class="studio-control-row studio-transport">
+          @if (state === 'idle') {
+            <button class="studio-record-button" (click)="startRecording()">
+              <span class="studio-record-icon"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg></span>
+              <span>{{ tr.t('Start Recording') }}</span>
+            </button>
+          }
+          @if (state === 'recording') {
+            <button class="studio-control-button" (click)="pause()">{{ tr.t('Pause') }}</button>
+            <button class="studio-control-button" (click)="stop()">{{ tr.t('Stop') }}</button>
+          }
+          @if (state === 'paused') {
+            <button class="studio-control-button" (click)="resume()">{{ tr.t('Resume') }}</button>
+            <button class="studio-control-button" (click)="stop()">{{ tr.t('Stop') }}</button>
+          }
         </div>
       </div>
+      @if (state === 'done' && audioUrl) {
+        <div class="studio-player">
+          <strong>{{ tr.t('Completed recording') }}</strong>
+          <audio controls [src]="audioUrl"></audio>
+          <div class="studio-footer"><button class="primary-button" (click)="proceed()">{{ tr.t('Write transcription') }} →</button></div>
+        </div>
+      }
+      @if (state === 'idle' || state === 'done') {
+        <div class="studio-file">
+          <label>{{ tr.t('Or upload a 30–60 minute audio file (WAV, MP3, M4A, OGG)') }}</label>
+          <input type="file" accept=".wav,.mp3,.m4a,.ogg,.webm" (change)="onFile($event)" />
+        </div>
+      }
     }
-
-    <div class="studio-file">
-      <label>Or upload an audio file (WAV, MP3, M4A, OGG)</label>
-      <input type="file" accept=".wav,.mp3,.m4a,.ogg" (change)="onFile($event)" />
-    </div>
+    @if (notice && (state === 'testReady' || state === 'testing' || state === 'testReview')) {
+      <p class="form-error" style="text-align:center">{{ tr.t(notice) }}</p>
+    }
   </div>
 </section>

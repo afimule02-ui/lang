@@ -2,37 +2,51 @@
   <div><div class="eyebrow">PROJECT SETUP · 01</div><h1>{{ tr.t('Speaker') }}</h1></div>
 </div>
 <section class="workspace-card">
+  <div class="form-grid speaker-setup">
+    <label class="field"><span>{{ tr.t('Number of speakers') }}</span>
+      <select [(ngModel)]="speakerCount" name="speakerCount" (ngModelChange)="syncSpeakers()">
+        @for (count of [1,2,3,4,5,6,7,8,9,10]; track count) { <option [ngValue]="count">{{ count }}</option> }
+      </select>
+    </label>
+    <label class="field"><span>{{ tr.t('Recording type') }}</span>
+      <select [(ngModel)]="recordingType" name="recordingType">
+        <option value="Conversation">{{ tr.t('Conversation') }}</option>
+        <option value="Storytelling">{{ tr.t('Storytelling') }}</option>
+        <option value="Interview">{{ tr.t('Interview') }}</option>
+        <option value="One-person speech">{{ tr.t('One-person speech') }}</option>
+      </select>
+    </label>
+  </div>
   <div class="form-grid">
     @for (s of speakers; track s.speakerId; let i = $index) {
       <fieldset class="speaker-field">
         <legend>{{ tr.t('Speaker') }} {{ i + 1 }}</legend>
         <label>{{ tr.t('Speaker ID') }}<input [value]="s.speakerId" readonly /></label>
-        <label>Age range *<input [(ngModel)]="s.ageRange" [name]="'age'+i" placeholder="e.g. 18–25" required /></label>
-        <label>Gender
+        <label>{{ tr.t('Full name') }} *<input [(ngModel)]="s.name" [name]="'name'+i" placeholder="{{ tr.t('Full name') }}" required /></label>
+        <label>{{ tr.t('Age range') }} *<input [(ngModel)]="s.ageRange" [name]="'age'+i" placeholder="e.g. 18–25" required /></label>
+        <label>{{ tr.t('Gender') }}
           <select [(ngModel)]="s.gender" [name]="'gender'+i">
-            <option value="">—</option>
-            <option>Woman</option><option>Man</option><option>Prefer not to say</option>
+            <option value="">—</option><option>Woman</option><option>Man</option><option>Prefer not to say</option>
           </select>
         </label>
-        <label>Education *
+        <label>{{ tr.t('Education') }} *
           <select [(ngModel)]="s.educationLevel" [name]="'edu'+i" required>
-            <option value="">Select</option>
-            <option>No formal schooling</option><option>Primary school</option>
-            <option>Secondary school</option><option>Bachelor's degree</option>
-            <option>Postgraduate degree</option><option>Prefer not to say</option>
+            <option value="">{{ tr.t('Select') }}</option>
+            <option>No formal schooling</option><option>Primary school</option><option>Secondary school</option>
+            <option>Bachelor's degree</option><option>Postgraduate degree</option><option>Prefer not to say</option>
           </select>
         </label>
-        <label>Language *<input [(ngModel)]="s.preferredLanguage" [name]="'lang'+i" required /></label>
-        <label>Region<input [(ngModel)]="s.region" [name]="'region'+i" /></label>
-        <label>Dialect<input [(ngModel)]="s.dialect" [name]="'dialect'+i" /></label>
+        <label>{{ tr.t('Language') }} *<input [(ngModel)]="s.preferredLanguage" [name]="'lang'+i" required /></label>
+        <label>{{ tr.t('Region') }}<input [(ngModel)]="s.region" [name]="'region'+i" /></label>
+        <label>{{ tr.t('Dialect') }}<input [(ngModel)]="s.dialect" [name]="'dialect'+i" /></label>
       </fieldset>
     }
   </div>
   <label class="check-row">
     <input type="checkbox" [(ngModel)]="consent" name="consent" />
-    <span>Consent from every participant is required before recording.</span>
+    <span>{{ tr.t('Consent from every participant is required before recording.') }}</span>
   </label>
-  @if (error) { <div class="form-error">{{ error }}</div> }
+  @if (error) { <div class="form-error">{{ tr.t(error) }}</div> }
   <div class="form-footer">
     <button class="primary-button" (click)="submit()" [disabled]="loading">{{ tr.t('Continue') }}</button>
   </div>

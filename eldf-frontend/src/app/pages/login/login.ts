@@ -3,6 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { TranslateService } from '../../services/translate.service';
+import { AFRICAN_PHONE_COUNTRIES, internationalPhoneNumber } from '../../services/africa-phone';
 
 @Component({
   selector: 'app-login',
@@ -12,7 +13,10 @@ import { TranslateService } from '../../services/translate.service';
 })
 export class LoginComponent implements OnInit {
   role: 'contributor' | 'admin' | 'agent' = 'contributor';
+  registered = false;
   phone = '';
+  dialCode = '251';
+  phoneCountries = AFRICAN_PHONE_COUNTRIES;
   password = '';
   error = '';
   loading = false;
@@ -25,8 +29,11 @@ export class LoginComponent implements OnInit {
   ) {}
 
   ngOnInit() {
-    const r = this.route.snapshot.paramMap.get('role');
-    this.role = (r === 'admin' || r === 'agent') ? r : 'contributor';
+    this.route.paramMap.subscribe(params => {
+      const r = params.get('role');
+      this.role = (r === 'admin' || r === 'agent') ? r : 'contributor';
+    });
+    this.route.queryParamMap.subscribe(params => this.registered = params.get('registered') === '1');
   }
 
   async submit() {
@@ -34,11 +41,11 @@ export class LoginComponent implements OnInit {
     this.loading = true;
     try {
       const form = new FormData();
-      form.append('phone', this.phone.startsWith('+') ? this.phone : '+251' + this.phone);
+      form.append('phone', internationalPhoneNumber(this.phone, this.dialCode));
       form.append('password', this.password);
       const user = await this.auth.login(form);
       if (user.role !== this.role) {
-        await this.auth.logout();
+        await this.auth.logout(false);
         this.error = 'This account does not have access to this sign-in page.';
         return;
       }

@@ -1,6 +1,6 @@
 <div class="page-heading">
   <div>
-    <div class="eyebrow">CONTRIBUTOR · DEMO</div>
+    <div class="eyebrow">CONTRIBUTOR WORKSPACE</div>
     <h1>{{ tr.t('Welcome back') }}{{ user ? ', ' + user.name : '' }}</h1>
     <p>{{ tr.t('Your own tasks and contributions') }}</p>
   </div>
@@ -8,13 +8,42 @@
 </div>
 
 <div class="metrics-grid">
-  <div class="metric-card"><span>{{ tr.t('My tasks') }}</span><strong>0</strong></div>
-  <div class="metric-card"><span>{{ tr.t('Awaiting review') }}</span><strong>0</strong></div>
-  <div class="metric-card"><span>{{ tr.t('Approved') }}</span><strong>0</strong></div>
-  <div class="metric-card"><span>{{ tr.t('Returned') }}</span><strong>0</strong></div>
+  <div class="metric-card"><span>{{ tr.t('My tasks') }}</span><strong>{{ workspace.data()?.drafts?.length ?? 0 }}</strong></div>
+  <div class="metric-card"><span>{{ tr.t('Awaiting review') }}</span><strong>{{ count('review') }}</strong></div>
+  <div class="metric-card"><span>{{ tr.t('Approved') }}</span><strong>{{ count('approved') }}</strong></div>
+  <div class="metric-card"><span>{{ tr.t('Returned') }}</span><strong>{{ count('returned') }}</strong></div>
 </div>
+
+@if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
+@if (workspace.error()) { <p class="form-error">{{ workspace.error() }}</p> }
 
 <section class="workspace-card">
   <h2>{{ tr.t('My submissions') }}</h2>
-  <p class="demo-note">No submissions yet. <a routerLink="/record">Start recording</a> to contribute.</p>
+  @if (workspace.data()?.submissions?.length) {
+    <div class="panel" *ngFor="let submission of workspace.data()?.submissions">
+      <div class="page-heading">
+        <div><h3>{{ submission.language }}</h3><p>{{ submission.durationSeconds / 60 | number:'1.0-0' }} min · {{ submission.createdAt }}</p></div>
+        <span class="status-pill">{{ submission.status }}</span>
+      </div>
+      <audio controls [src]="submission.audioUrl"></audio>
+      @if (submission.agentComment) { <p>{{ submission.agentComment }}</p> }
+      @if (submission.adminComment) { <p>{{ submission.adminComment }}</p> }
+    </div>
+  } @else if (!workspace.loading() && !workspace.error()) {
+    <p>{{ tr.t('No submissions yet.') }} <a routerLink="/record">{{ tr.t('Start recording') }}</a></p>
+  }
+</section>
+
+<section class="workspace-card">
+  <h2>Payments</h2>
+  <p>Available balance: <strong>{{ (workspace.data()?.balance ?? 0) | number:'1.2-2' }} ETB</strong> · Requests are limited to 1,000–10,000 ETB.</p>
+  @if (payoutMessage) { <p class="status-pill approved">{{ payoutMessage }}</p> }
+  @if (payoutError) { <p class="form-error">{{ payoutError }}</p> }
+  <form class="payout-form" (ngSubmit)="requestPayout()">
+    <label class="field">Request amount (ETB)<input type="number" name="payoutAmount" [(ngModel)]="payoutAmount" min="1000" max="10000" step="100" required /></label>
+    <button class="primary-button" [disabled]="submittingPayout || payoutAmount < 1000 || payoutAmount > 10000">{{ submittingPayout ? 'Sending…' : 'Request payout' }}</button>
+  </form>
+  @for (payment of workspace.data()?.paymentRequests ?? []; track payment.id) {
+    <div class="panel"><strong>{{ payment.amount | number:'1.2-2' }} {{ payment.currency }}</strong> · {{ payment.status }} · {{ payment.requestedAt }} @if (payment.reviewNote) { · {{ payment.reviewNote }} }</div>
+  } @empty { <p>No payment requests yet.</p> }
 </section>

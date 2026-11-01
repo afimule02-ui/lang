@@ -3,9 +3,9 @@
 </div>
 
 @if (success) {
-  <div class="demo-callout">
+  <div class="status-pill approved">
     ✅ Your recording, transcript, and translation were submitted for review.
-    <br><a routerlink="/dashboard" style="color:var(--green)">Go to dashboard →</a>
+    <br><a routerLink="/dashboard" style="color:var(--green)">Go to dashboard →</a>
   </div>
 } @else {
   <section class="workspace-card">
@@ -17,10 +17,6 @@
       <label>{{ tr.t('Translation') }}</label>
       <textarea [(ngModel)]="translation" name="translation" rows="5"
         placeholder="Translate the transcript while keeping its meaning."></textarea>
-    </div>
-    <div class="field">
-      <label>{{ tr.t('Notes') }}</label>
-      <textarea [(ngModel)]="notes" name="notes" rows="3"></textarea>
     </div>
     @if (error) { <div class="form-error">{{ error }}</div> }
     <div class="form-footer">

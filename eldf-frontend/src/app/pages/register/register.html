@@ -15,14 +15,20 @@
     <div class="field">
       <label>{{ tr.t('Phone number') }} *</label>
       <div class="phone-field">
-        <span>+251</span>
-        <input [(ngModel)]="phone" name="phone" placeholder="9XX XXX XXX" required />
+        <select [(ngModel)]="dialCode" name="dialCode" [attr.aria-label]="tr.t('Country calling code')">
+          @for (country of phoneCountries; track country.code) { <option [value]="country.dialCode">+{{ country.dialCode }} · {{ country.name }}</option> }
+        </select>
+        <input [(ngModel)]="phone" name="phone" placeholder="Phone number" inputmode="tel" required />
       </div>
     </div>
     <div class="field">
       <label>{{ tr.t('Password') }} *</label>
       <input type="password" [(ngModel)]="password" name="password" minlength="10" required />
       <small>At least 10 characters</small>
+    </div>
+    <div class="field">
+      <label>{{ tr.t('Confirm password') }} *</label>
+      <input type="password" [(ngModel)]="passwordConfirm" name="passwordConfirm" minlength="10" required />
     </div>
     <div class="field">
       <label>{{ tr.t('Preferred interface language') }}</label>
@@ -39,9 +45,9 @@
   </div>
   <div class="field">
     <label>{{ tr.t('Staff invitation code (if you have one)') }}</label>
-    <input type="password" [(ngModel)]="staffCode" name="staff_code" />
+    <input type="password" [(ngModel)]="staffCode" name="staff_code" autocomplete="off" />
+    <small>{{ tr.t('Leave this empty unless an administrator gave you a staff code.') }}</small>
   </div>
-
   <section class="consent-box">
     <h3>Terms &amp; Consent</h3>
     <label class="check-row">
@@ -59,7 +65,7 @@
   }
 
   <div class="form-footer">
-    <button class="primary-button" [disabled]="loading">{{ tr.t('Register') }}</button>
+    <button class="primary-button" [disabled]="loading">{{ tr.t(loading ? 'Creating account…' : 'Register') }}</button>
     <a routerLink="/login/contributor" class="text-button">Already have an account?</a>
   </div>
 </form>

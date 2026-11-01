@@ -1,14 +1,7 @@
 <div class="app-frame">
   <aside class="sidebar" [class.open]="sidebarOpen">
     <a class="brand" routerLink="/">
-      <span class="brand-mark">
-        <svg viewBox="0 0 48 48"><path d="M8 28c4-10 8 10 12 0s8-10 12 0 8 10 12 0"/><path d="M24 5 41 15v18L24 43 7 33V15z"/></svg>
-        <b>አ</b>
-      </span>
-      <span class="brand-copy">
-        <strong>language<span>factory</span></strong>
-        <small>ETHIOPIAN LANGUAGES</small>
-      </span>
+      <span class="brand-afri-logo"><img src="/africorpus-ai.svg" alt="AfriCorpus AI" /></span>
     </a>
 
     <div class="workspace-label">{{ tr.t('WORKSPACE') }} <i></i></div>
@@ -18,6 +11,7 @@
       <a routerLink="/catalog" routerLinkActive="active" class="nav-link">▦ {{ tr.t('Language catalog') }}</a>
 
       @if (user) {
+        <a routerLink="/change-password" routerLinkActive="active" class="nav-link">▧ {{ tr.t('Change password') }}</a>
         @if (user.role === 'admin') {
           <div class="nav-group-label">{{ tr.t('Administration') }}</div>
           <a routerLink="/admin" routerLinkActive="active" class="nav-link">▤ {{ tr.t('Administration') }}</a>
@@ -40,10 +34,6 @@
     </nav>
 
     <div class="sidebar-bottom">
-      <div class="demo-mini">
-        <b>✳ {{ tr.t('A home for every Ethiopian voice') }}</b>
-        <p>{{ tr.t('Demo only') }}</p>
-      </div>
       @if (user) {
         <button class="profile-mini" (click)="logout()">
           <span class="avatar">{{ initials }}</span>
@@ -66,7 +56,6 @@
           <span>|</span>
           <button [class.on]="lang === 'en'" (click)="setLang('en')">English</button>
         </div>
-        <span class="demo-badge">{{ tr.t('Demo data') }}</span>
       </div>
     </header>
 
@@ -75,7 +64,7 @@
     </main>
 
     <footer class="page-footer">
-      <span>{{ tr.t('A home for every Ethiopian voice') }} <b>♥</b></span>
+      <span>{{ tr.t('AFRICA · COMMUNITY · LANGUAGES') }} <b>· AFRICORPUS AI</b></span>
     </footer>
   </div>
 </div>

@@ -101,7 +101,6 @@ app.MapPost("/api/auth/register", async (HttpRequest request, EldfDbContext db) 
     catch (DbUpdateException) { return Problem(409, "An account already uses this phone number."); }
     if (role == "agent") await AgentReferralCodes.EnsureAsync(db, user);
     await WorkflowEvents.RecordAsync(db, user, "Account registered", "User", user.Id.ToString(), role);
-    await IssueSession(db, user, request, app);
     return Results.Json(new { user = View(user) });
 });
 
@@ -139,8 +138,8 @@ app.MapPost("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
     var user = await SessionAuth.CurrentUser(request, db);
     if (user is null) return Problem(401, "Please sign in to continue.");
     using var payload = await JsonDocument.ParseAsync(request.Body);
-    if (!payload.RootElement.TryGetProperty("speakers", out var list) || list.ValueKind != JsonValueKind.Array || list.GetArrayLength() < 2)
-        return Problem(422, "At least two speaker profiles are required.");
+    if (!payload.RootElement.TryGetProperty("speakers", out var list) || list.ValueKind != JsonValueKind.Array || list.GetArrayLength() < 1)
+        return Problem(422, "At least one speaker profile is required.");
     var entries = JsonSerializer.Deserialize<List<SpeakerInput>>(list.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
     var existing = await db.Speakers.Where(x => x.UserAccountId == user.Id).ToListAsync();
     for (var i = 0; i < entries.Count; i++)
@@ -253,8 +252,10 @@ app.Run();
 static IResult Problem(int status, string detail) => Results.Json(new { detail }, statusCode: status);
 static string NormalizePhone(string phone)
 {
-    phone = string.Concat(phone.Where(c => !char.IsWhiteSpace(c)));
-    return phone.Length == 9 && phone.All(char.IsDigit) ? "+251" + phone : phone;
+    var digits = string.Concat(phone.Where(char.IsDigit));
+    if (digits.StartsWith("251", StringComparison.Ordinal) && digits.Length == 12) return "+" + digits;
+    if (digits.StartsWith('0') && digits.Length == 10) return "+251" + digits[1..];
+    return digits.Length == 9 ? "+251" + digits : phone.Trim();
 }
 static bool Checked(string value) => value.Equals("true", StringComparison.OrdinalIgnoreCase) || value.Equals("on", StringComparison.OrdinalIgnoreCase) || value == "1";
 static string Limit(string? value, int length, string fallback = "") => string.IsNullOrWhiteSpace(value) ? fallback : value.Trim()[..Math.Min(value.Trim().Length, length)];

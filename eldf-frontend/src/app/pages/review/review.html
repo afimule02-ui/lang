@@ -1,13 +1,30 @@
-<div class="page-heading">
-  <div><div class="eyebrow">QUALITY · ADMIN</div><h1>{{ tr.t('Review queues') }}</h1></div>
-</div>
+<div class="page-heading"><div><div class="eyebrow">QUALITY REVIEW</div><h1>{{ tr.t('Review queues') }}</h1></div></div>
+@if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
+@if (workspace.error()) { <p class="form-error">{{ workspace.error() }}</p> }
+@if (error) { <p class="form-error">{{ error }}</p> }
+@if (message) { <p class="status-pill approved">{{ message }}</p> }
 
-<div class="admin-tabs">
-  @for (t of tabs; track t) {
-    <button class="filter-chip" [class.selected]="tab===t" (click)="setTab(t)">{{ tr.t(t) }}</button>
-  }
-</div>
-
-<div class="workspace-card">
-  <p class="demo-note">No items awaiting review. Submissions from contributors will appear here.</p>
-</div>
+@for (item of pending; track item.id) {
+  <section class="workspace-card">
+    <div class="page-heading">
+      <div><h2>{{ item.language }} · {{ item.contributorName }}</h2><p>{{ item.durationSeconds / 60 | number:'1.0-0' }} min · {{ item.createdAt }}</p></div>
+      <span class="status-pill">{{ item.status }}</span>
+    </div>
+    <audio controls [src]="item.audioUrl"></audio>
+    <div class="field"><label>{{ tr.t('Transcript') }}</label><p>{{ item.transcript }}</p></div>
+    <div class="field"><label>{{ tr.t('Translation') }}</label><p>{{ item.translation }}</p></div>
+    <div class="field"><label>{{ tr.t('Review note') }}</label><textarea [(ngModel)]="notes[item.id]" rows="3"></textarea></div>
+    <div class="entry-actions">
+      @if (auth.user()?.role === 'agent') {
+        <button class="primary-button" [disabled]="reviewingId === item.id" (click)="decide(item, 'accept')">Forward to admin</button>
+        <button class="secondary-button" [disabled]="reviewingId === item.id || !(notes[item.id] ?? '').trim()" (click)="decide(item, 'return')">Return with note</button>
+      } @else if (auth.user()?.role === 'admin') {
+        <button class="primary-button" [disabled]="reviewingId === item.id" (click)="decide(item, 'approve')">Approve</button>
+        <button class="secondary-button" [disabled]="reviewingId === item.id || !(notes[item.id] ?? '').trim()" (click)="decide(item, 'return')">Return with note</button>
+        <button class="danger-button" [disabled]="reviewingId === item.id || !(notes[item.id] ?? '').trim()" (click)="decide(item, 'reject')">Reject</button>
+      }
+    </div>
+  </section>
+} @empty {
+  @if (!workspace.loading() && !workspace.error()) { <section class="workspace-card"><p>No submissions are waiting for your review.</p></section> }
+}

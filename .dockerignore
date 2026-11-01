@@ -6,6 +6,8 @@ outputs/
 work/
 Eldf.Api/bin/
 Eldf.Api/obj/
+**/node_modules/
+**/dist/
 __pycache__/
 *.py[cod]
 eldf-server-data/

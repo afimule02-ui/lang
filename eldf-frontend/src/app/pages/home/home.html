@@ -1,40 +1,43 @@
-<section class="welcome-hero">
-  <div>
-    <div class="eyebrow">ETHIOPIA · COMMUNITY · LANGUAGES</div>
-    <h1>{{ tr.t('Ethiopian Languages Data Factory') }}</h1>
-    <p>{{ tr.t('Collect, transcribe, translate, and review speech together.') }}</p>
-  </div>
-  <div class="hero-art"><b>አ</b><i>◌</i><span>✳</span></div>
-</section>
-
-<div class="entry-grid">
-  <section class="entry-card">
-    <span class="eyebrow">{{ tr.t('Contributor') }}</span>
-    <h2>{{ tr.t('Build your profile and contribute to language datasets.') }}</h2>
-    <div class="entry-actions">
-      <a routerLink="/login/contributor" class="primary-button">{{ tr.t('Sign in as contributor') }}</a>
-      <a routerLink="/register" class="secondary-button">{{ tr.t('Create contributor account') }}</a>
+<div class="afri-landing" [class.amharic]="lang === 'am'">
+  <header class="afri-landing-nav">
+    <a class="afri-wordmark" routerLink="/" aria-label="AfriCorpus AI — Powering African Language and Speech Datasets">
+      <img src="/africorpus-ai.svg" alt="AfriCorpus AI — Powering African Language and Speech Datasets" />
+    </a>
+    <div class="afri-landing-actions">
+      <div class="afri-language-switch" aria-label="Preferred interface language">
+        <button type="button" [attr.aria-pressed]="lang === 'am'" (click)="setLang('am')">አማርኛ</button><span>|</span><button type="button" [attr.aria-pressed]="lang === 'en'" (click)="setLang('en')">English</button>
+      </div>
+      <a routerLink="/login/contributor" class="afri-button afri-button-secondary">{{ lang === 'am' ? 'የተሳታፊ መግቢያ' : 'Contributor sign in' }}</a>
+      <a routerLink="/register" class="afri-button afri-button-primary">{{ lang === 'am' ? 'የተሳታፊ መለያ ይፍጠሩ' : 'Create contributor account' }}</a>
     </div>
-  </section>
+  </header>
 
-  <section class="entry-card admin-entry">
-    <span class="eyebrow">{{ tr.t('Administrator') }}</span>
-    <h2>{{ tr.t('Management dashboard') }}</h2>
-    <a routerLink="/login/admin" class="secondary-button">{{ tr.t('Administrator sign-in') }}</a>
-  </section>
+  <main class="afri-landing-main">
+    <section class="afri-hero">
+      <div class="afri-hero-copy">
+        <p class="afri-eyebrow">AFRICORPUS AI</p>
+        <h1>{{ vision[lang] }}</h1>
+        <p class="afri-hero-description">{{ mission[lang] }}</p>
+        <div class="afri-cover-actions" aria-label="Choose your account">
+          <a routerLink="/register" class="afri-button afri-button-primary">{{ lang === 'am' ? 'የተሳታፊ ምዝገባ' : 'Contributor register' }}</a>
+          <a routerLink="/login/contributor" class="afri-button afri-button-secondary">{{ lang === 'am' ? 'የተሳታፊ መግቢያ' : 'Contributor login' }}</a>
+          <a routerLink="/login/agent" class="afri-button afri-button-outline">{{ lang === 'am' ? 'የኤጀንት መግቢያ' : 'Agent login' }}</a>
+          <a routerLink="/login/admin" class="afri-button afri-button-outline">{{ lang === 'am' ? 'የአስተዳዳሪ መግቢያ' : 'Admin login' }}</a>
+        </div>
+      </div>
 
-  <section class="entry-card">
-    <span class="eyebrow">{{ tr.t('Agent / focal person') }}</span>
-    <h2>{{ tr.t('Support a contributor team') }}</h2>
-    <a routerLink="/login/agent" class="secondary-button">{{ tr.t('Agent sign-in') }}</a>
-  </section>
+      <aside class="afri-signal-card" aria-label="Language data workflow illustration">
+        <div class="afri-signal-card-top"><span>AFRICAN LANGUAGE &amp; SPEECH WORKSPACE</span><b>AFRICORPUS AI</b></div>
+        <div class="afri-large-brand" aria-hidden="true">
+          <img src="/africorpus-ai.svg" alt="" />
+        </div>
+        <div class="afri-signal-card-bottom">
+          <span><b>01</b>{{ lang === 'am' ? 'የድምፅ ስብስብ' : 'Audio collection' }}</span>
+          <span><b>02</b>{{ lang === 'am' ? 'ጽሑፍ · ትርጉም' : 'Transcription · Translation' }}</span>
+          <span><b>03</b>{{ lang === 'am' ? 'የጥራት ግምገማ' : 'Quality review' }}</span>
+        </div>
+      </aside>
+    </section>
+  </main>
+  <footer class="afri-landing-footer"><span><b>AFRICORPUS AI</b> · Powering African Language &amp; Speech Datasets</span></footer>
 </div>
-
-<section class="panel">
-  <h3>{{ tr.t('Language catalog') }}</h3>
-  <div class="language-chip-list">
-    @for (lang of languages; track lang) {
-      <span class="language-chip">{{ tr.t(lang) }}</span>
-    }
-  </div>
-</section>

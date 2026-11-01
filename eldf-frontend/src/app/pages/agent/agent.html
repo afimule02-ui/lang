@@ -1,21 +1,40 @@
 <div class="page-heading">
   <div>
-    <div class="eyebrow">AGENT · DEMO</div>
+    <div class="eyebrow">AGENT WORKSPACE</div>
     <h1>{{ tr.t('Agent workspace') }}</h1>
     <p>{{ tr.t('Support a contributor team') }}</p>
   </div>
 </div>
 
-<div class="demo-callout warning">
-  Agent tools — review contributor submissions and manage your team.
-</div>
+@if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
+@if (workspace.error()) { <p class="form-error">{{ workspace.error() }}</p> }
 
 <section class="workspace-card">
   <h2>{{ tr.t('Your contributor team') }}</h2>
-  <p class="demo-note">No contributors linked yet. Share your referral link during contributor registration.</p>
+  @if (workspace.data()?.referralCode) { <p>Referral code: <strong>{{ workspace.data()?.referralCode }}</strong></p> }
+  @for (contributor of workspace.data()?.contributors ?? []; track contributor.id) {
+    <div class="panel"><strong>{{ contributor.name }}</strong> · {{ contributor.phone }} · {{ contributor.registeredAt }}</div>
+  } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No contributors are linked to your account yet.</p> } }
 </section>
 
 <section class="workspace-card">
-  <h2>{{ tr.t('Pending reviews') }}</h2>
-  <p class="demo-note">No submissions awaiting review.</p>
+  <h2>Team payout requests</h2>
+  @if (paymentError) { <p class="form-error">{{ paymentError }}</p> }
+  @for (payment of workspace.data()?.paymentRequests ?? []; track payment.id) {
+    <div class="panel payment-panel">
+      <div class="page-heading"><div><strong>{{ payment.userName }}</strong> · {{ payment.userPhone }}<p>{{ payment.amount | number:'1.2-2' }} {{ payment.currency }} · {{ payment.requestedAt }}</p></div><span class="status-pill pending">{{ payment.status }}</span></div>
+      @if (payment.status === 'Pending agent review') {
+        <label class="field">Review note<textarea [(ngModel)]="paymentNotes[payment.id]" rows="2"></textarea></label>
+        <div class="entry-actions"><button class="primary-button" [disabled]="paymentBusyId === payment.id" (click)="reviewPayment(payment.id, 'accept')">Forward to admin</button><button class="secondary-button" [disabled]="paymentBusyId === payment.id || !(paymentNotes[payment.id] ?? '').trim()" (click)="reviewPayment(payment.id, 'return')">Return with note</button></div>
+      }
+      @if (payment.reviewNote) { <p>{{ payment.reviewNote }}</p> }
+    </div>
+  } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No payout requests are waiting for your team.</p> } }
+</section>
+
+<section class="workspace-card">
+  <h2>{{ tr.t('Team submissions') }}</h2>
+  @for (submission of workspace.data()?.submissions ?? []; track submission.id) {
+    <div class="panel"><strong>{{ submission.language }}</strong> · {{ submission.contributorName }} · {{ submission.status }} <a class="text-button" routerLink="/review">Review →</a></div>
+  } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No submissions are assigned to your team.</p> } }
 </section>

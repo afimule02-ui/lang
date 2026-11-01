@@ -74,17 +74,49 @@ public static class WorkflowEvents
 public static class WorkflowApiExtensions
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
-    private const string DefaultVision = "የአፍሪካ እያንዳንዱ ድምፅ በዲጂታል ዓለም ውስጥ ቦታ እንዲኖረው።";
-    private const string DefaultVisionEnglish = "Every African voice deserves a place in the digital world.";
-    private const string DefaultMission = "የአፍሪካን ቋንቋዎች በፈቃድ የተመሠረተ ድምፅ፣ ጽሑፍ፣ ትርጉምና ጥራት ማረጋገጫ ሥራ እንሰበስባለን።";
-    private const string DefaultMissionEnglish = "We collect consent-led audio, transcription, translation, and quality-reviewed data across Africa's languages.";
+    private const string DefaultVision = "የአፍሪካ ቋንቋ ሁሉ በዲጂታል ዓለም ድምፁ ይሰማ።";
+    private const string DefaultVisionEnglish = "Every African language deserves a voice in the digital world.";
+    private const string DefaultMission = "ከአፍሪካ ማኅበረሰቦች ጋር በመስራት ቋንቋዎችን እንሰበስባለን፣ እናስቀምጣለን፣ ለትምህርትና ለዲጂታል አጠቃቀም እናዳርሳለን።";
+    private const string DefaultMissionEnglish = "We work with African communities to collect, preserve, and share language data for learning and digital use.";
 
     public static void MapWorkflowApi(this WebApplication app)
     {
+        app.MapPost("/api/auth/password-reset/request", async (HttpRequest request, EldfDbContext db) =>
+        {
+            var input = await request.ReadFromJsonAsync<PasswordResetRequestInput>(JsonOptions);
+            var phone = NormalizeInternationalPhone(input?.Phone ?? "");
+            if (phone.Length < 8 || phone.Length > 16 || phone[0] != '+') return Results.Accepted();
+            var account = await db.Users.SingleOrDefaultAsync(x => x.Phone == phone && x.IsActive);
+            if (account is null) return Results.Accepted();
+            var recentRequest = await db.ActivityEvents.AnyAsync(x => x.EventType == "Password reset requested" && x.EntityType == "User" && x.EntityId == account.Id.ToString() && x.CreatedAtUtc > DateTime.UtcNow.AddMinutes(-15));
+            if (!recentRequest) await WorkflowEvents.RecordAsync(db, null, "Password reset requested", "User", account.Id.ToString(), "Verify the caller using the registered phone before issuing a temporary password.");
+            return Results.Accepted();
+        });
+
+        app.MapPost("/api/auth/change-password", async (HttpRequest request, EldfDbContext db) =>
+        {
+            var user = await SessionAuth.CurrentUser(request, db);
+            if (user is null) return Problem(401, "Please sign in to continue.");
+            var input = await request.ReadFromJsonAsync<PasswordChangeInput>(JsonOptions);
+            var currentPassword = input?.CurrentPassword ?? "";
+            var newPassword = input?.NewPassword ?? "";
+            if (!VerifyPassword(currentPassword, user.PasswordHash)) return Problem(422, "The current password is incorrect.");
+            if (newPassword.Length < 10) return Problem(422, "Use a password with at least 10 characters.");
+            if (newPassword == currentPassword) return Problem(422, "Choose a new password different from the current one.");
+            user.PasswordHash = HashPassword(newPassword);
+            var sessionToken = request.Cookies["eldf_session"] ?? "";
+            var currentTokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(sessionToken))).ToLowerInvariant();
+            var otherSessions = await db.Sessions.Where(x => x.UserAccountId == user.Id && x.TokenHash != currentTokenHash).ToListAsync();
+            db.Sessions.RemoveRange(otherSessions);
+            await db.SaveChangesAsync();
+            await WorkflowEvents.RecordAsync(db, user, "Password changed", "User", user.Id.ToString());
+            return Results.Json(new { ok = true });
+        });
+
         app.MapGet("/api/site-content", async (EldfDbContext db) =>
         {
             var content = await db.SiteContents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == 1);
-            return Results.Json(new { vision = new { am = content?.Vision ?? DefaultVision, en = content?.VisionEnglish ?? DefaultVisionEnglish }, mission = new { am = content?.Mission ?? DefaultMission, en = content?.MissionEnglish ?? DefaultMissionEnglish } });
+            return Results.Json(new { vision = new { am = AfricanWideCopy(content?.Vision, DefaultVision), en = AfricanWideCopy(content?.VisionEnglish, DefaultVisionEnglish) }, mission = new { am = AfricanWideCopy(content?.Mission, DefaultMission), en = AfricanWideCopy(content?.MissionEnglish, DefaultMissionEnglish) } });
         });
 
         app.MapGet("/api/workspace", async (HttpRequest request, EldfDbContext db) =>
@@ -110,7 +142,7 @@ public static class WorkflowApiExtensions
                     submissions = submissions.Select(x => SubmissionView(x, reviews.GetValueOrDefault(x.Id, []))).ToList(),
                     supportTickets = tickets.Select(TicketView).ToList(),
                     paymentRequests = payments.Select(PaymentView).ToList(),
-                    siteContent = new { vision = new { am = content?.Vision ?? DefaultVision, en = content?.VisionEnglish ?? DefaultVisionEnglish }, mission = new { am = content?.Mission ?? DefaultMission, en = content?.MissionEnglish ?? DefaultMissionEnglish } },
+                    siteContent = new { vision = new { am = AfricanWideCopy(content?.Vision, DefaultVision), en = AfricanWideCopy(content?.VisionEnglish, DefaultVisionEnglish) }, mission = new { am = AfricanWideCopy(content?.Mission, DefaultMission), en = AfricanWideCopy(content?.MissionEnglish, DefaultMissionEnglish) } },
                     events = events.Select(EventView).ToList(),
                     report = BuildReport(submissions, users, payments, tickets)
                 });
@@ -380,6 +412,30 @@ public static class WorkflowApiExtensions
             return Results.Json(AdminUserView(target, await db.AgentReferrals.Where(x => x.AgentUserId == target.Id).Select(x => x.Code).SingleOrDefaultAsync()));
         });
 
+        app.MapPost("/api/admin/users/{id:int}/password-reset", async (int id, HttpRequest request, EldfDbContext db) =>
+        {
+            var admin = await SessionAuth.CurrentUser(request, db);
+            if (admin is null) return Problem(401, "Please sign in to continue.");
+            if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
+            var target = await db.Users.SingleOrDefaultAsync(x => x.Id == id && x.IsActive);
+            if (target is null) return Problem(404, "The active account was not found.");
+            var latestResetEvent = await db.ActivityEvents.Where(x => x.EntityType == "User" && x.EntityId == id.ToString() && (x.EventType == "Password reset requested" || x.EventType == "Password reset completed"))
+                .OrderByDescending(x => x.CreatedAtUtc).FirstOrDefaultAsync();
+            if (latestResetEvent is null || latestResetEvent.EventType != "Password reset requested") return Problem(409, "There is no pending password reset request for this account.");
+
+            var temporaryPassword = Convert.ToBase64String(RandomNumberGenerator.GetBytes(18)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            var salt = RandomNumberGenerator.GetBytes(16);
+            var hash = Rfc2898DeriveBytes.Pbkdf2(temporaryPassword, salt, 310_000, HashAlgorithmName.SHA256, 32);
+            target.PasswordHash = $"pbkdf2_sha256$310000${Convert.ToHexString(salt).ToLowerInvariant()}${Convert.ToHexString(hash).ToLowerInvariant()}";
+            var sessions = await db.Sessions.Where(x => x.UserAccountId == target.Id).ToListAsync();
+            db.Sessions.RemoveRange(sessions);
+            latestResetEvent.EventType = "Password reset completed";
+            latestResetEvent.Details = "Admin issued a temporary password after verifying the requester by phone.";
+            await db.SaveChangesAsync();
+            await WorkflowEvents.RecordAsync(db, admin, "Temporary password issued", "User", target.Id.ToString());
+            return Results.Json(new { temporaryPassword });
+        });
+
         app.MapGet("/api/support/tickets", async (HttpRequest request, EldfDbContext db) =>
         {
             var user = await SessionAuth.CurrentUser(request, db);
@@ -640,6 +696,26 @@ public static class WorkflowApiExtensions
     private static IResult Problem(int status, string detail) => Results.Json(new { detail }, statusCode: status);
     private static UserView View(UserAccount user) => new(user.Id, user.FullName, user.Phone, user.Role, user.InterfaceLanguage);
 
+    private static string HashPassword(string password)
+    {
+        var salt = RandomNumberGenerator.GetBytes(16);
+        var hash = Rfc2898DeriveBytes.Pbkdf2(password, salt, 310_000, HashAlgorithmName.SHA256, 32);
+        return $"pbkdf2_sha256$310000${Convert.ToHexString(salt).ToLowerInvariant()}${Convert.ToHexString(hash).ToLowerInvariant()}";
+    }
+
+    private static bool VerifyPassword(string password, string stored)
+    {
+        try
+        {
+            var parts = stored.Split('$');
+            if (parts.Length != 4 || parts[0] != "pbkdf2_sha256") return false;
+            var expected = Convert.FromHexString(parts[3]);
+            var actual = Rfc2898DeriveBytes.Pbkdf2(password, Convert.FromHexString(parts[2]), int.Parse(parts[1]), HashAlgorithmName.SHA256, expected.Length);
+            return CryptographicOperations.FixedTimeEquals(actual, expected);
+        }
+        catch { return false; }
+    }
+
     private static async Task<Dictionary<int, List<object>>> ReviewHistory(EldfDbContext db, List<int> ids)
     {
         if (ids.Count == 0) return [];
@@ -730,6 +806,22 @@ public static class WorkflowApiExtensions
 
     private static object EventView(ActivityEvent e) => new { id = e.Id, actorId = e.ActorUserId, role = e.ActorRole, type = e.EventType, entity = e.EntityType, entityId = e.EntityId, details = e.Details, createdAt = e.CreatedAtUtc };
 
+    private static string AfricanWideCopy(string? saved, string fallback) =>
+        string.IsNullOrWhiteSpace(saved) || saved.Contains("Ethiopia", StringComparison.OrdinalIgnoreCase) || saved.Contains("Ethiopian", StringComparison.OrdinalIgnoreCase) || saved.Contains("ኢትዮጵ", StringComparison.Ordinal)
+            ? fallback
+            : saved;
+
+    private static string NormalizeInternationalPhone(string phone)
+    {
+        var trimmed = phone.Trim();
+        var digits = string.Concat(trimmed.Where(char.IsDigit));
+        if (trimmed.StartsWith('+') && digits.Length is >= 8 and <= 15) return "+" + digits;
+        if (trimmed.StartsWith("00", StringComparison.Ordinal) && digits.Length is >= 10 and <= 17) return "+" + digits[2..];
+        if (digits.StartsWith("251", StringComparison.Ordinal) && digits.Length == 12) return "+" + digits;
+        if (digits.StartsWith('0') && digits.Length == 10) return "+251" + digits[1..];
+        return digits.Length == 9 ? "+251" + digits : trimmed;
+    }
+
     private static object BuildReport(List<WorkSubmission> submissions, List<UserAccount> users, List<PaymentRequest> payments, List<SupportTicket> tickets) => new
     {
         audioHours = Math.Round(submissions.Sum(x => (double)x.DurationSeconds) / 3600d, 2),
@@ -810,6 +902,8 @@ public sealed record SupportMessageInput(string? Message);
 public sealed record AdminTicketUpdateInput(string? Status, int? AssignedAgentId);
 public sealed record AgentTicketUpdateInput(bool? Escalate);
 public sealed record PaymentRequestInput(decimal Amount);
+public sealed record PasswordResetRequestInput(string? Phone);
+public sealed record PasswordChangeInput(string? CurrentPassword, string? NewPassword);
 public sealed record PaymentDecisionInput(string? Decision, string? Note);
 public sealed record AdminPaymentDecisionInput(string? Decision, string? Note, string? ProofReference);
 public sealed record SiteContentInput(string? VisionAm, string? VisionEn, string? MissionAm, string? MissionEn);

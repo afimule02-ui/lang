@@ -39,6 +39,8 @@ a { text-decoration: none; }
 .brand-copy strong { display: block; color: #f2fbfd; font: 800 16px Manrope; letter-spacing: -.03em; }
 .brand-copy strong span { color: #65d7e4; }
 .brand-copy small { font-size: 8px; letter-spacing: 1.1px; color: #9dbfc9; }
+.brand-afri-logo { display: block; width: 198px; max-width: 100%; line-height: 0; }
+.brand-afri-logo img { display: block; width: 100%; height: auto; }
 
 .workspace-label { font-size: 9px; letter-spacing: 1.3px; color: #92b5bf; font-weight: bold; padding: 0 12px; margin-bottom: 6px; }
 .workspace-label i { display: inline-block; background: #4ed5cc; width: 6px; height: 6px; border-radius: 50%; margin-left: 5px; }
@@ -54,9 +56,6 @@ a { text-decoration: none; }
 .nav-link.active { background: linear-gradient(90deg, #28abc0, #168da7); color: #fff; box-shadow: 0 6px 18px #031b2755; }
 
 .sidebar-bottom { margin-top: auto; }
-.demo-mini { border: 1px solid #ffffff20; background: #ffffff0c; border-radius: 9px; padding: 12px; margin: 0 3px 12px; font-size: 10px; color: #e5f3f5; }
-.demo-mini b { color: #4ed5cc; }
-.demo-mini p { font-size: 8px; line-height: 1.45; color: #aac4ca; margin: 6px 0 0; }
 
 .profile-mini {
   display: flex; align-items: center; gap: 9px; border: 0; border-top: 1px solid #ffffff1c;
@@ -87,7 +86,6 @@ a { text-decoration: none; }
 .switch { display: flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 7px; background: #fff; padding: 4px 7px; }
 .switch button { border: 0; background: transparent; padding: 4px 6px; color: #728077; font-size: 10px; border-radius: 4px; }
 .switch button.on { background: #e1f6f9; color: var(--green); font-weight: 700; }
-.demo-badge { font-size: 8px; letter-spacing: .45px; color: #117b90; background: #e8f7fa; padding: 6px 8px; border-radius: 12px; border: 1px solid #d2eef3; }
 
 /* Content */
 .content { padding: 32px 34px; flex: 1; max-width: 1200px; width: 100%; margin: 0 auto; }
@@ -154,9 +152,19 @@ a { text-decoration: none; }
 .field input:focus, .field textarea:focus, .field select:focus { border-color: #29a8be; box-shadow: 0 0 0 3px #38b7cb22; }
 .phone-field { display: flex; border: 1px solid #e5eae5; border-radius: 6px; overflow: hidden; }
 .phone-field span { padding: 10px; background: #f4f7f4; font-size: 11px; color: #68776e; border-right: 1px solid var(--line); }
+.phone-field select { flex: 0 0 170px; max-width: 45%; border: 0; border-right: 1px solid var(--line); background: #f4f7f4; padding: 9px 7px; color: #68776e; font-size: 10px; }
 .phone-field input { border: 0; border-radius: 0; flex: 1; }
 .form-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 17px; flex-wrap: wrap; }
 .form-error { font-size: 10px; color: #b6493c; margin: 8px 0; }
+.login-links { display: flex; justify-content: flex-end; margin: -4px 0 10px; }
+.login-success { display: block; width: fit-content; margin: 0 auto 14px; padding: 9px 12px; font-size: 11px; }
+.payout-form { display: flex; align-items: end; gap: 12px; flex-wrap: wrap; }
+.payout-form .field { min-width: 200px; margin: 8px 0; }
+.payment-panel { margin: 12px 0; }
+.role-badge { display: inline-block; margin-left: 8px; padding: 3px 8px; border-radius: 10px; background: #302711; color: #efbd3f; font-size: 9px; text-transform: uppercase; }
+.recovery-note { padding: 12px; border: 1px solid #4b4634; border-radius: 8px; background: #171811; color: #c8c5b6; font-size: 11px; line-height: 1.65; }
+.recovery-success { display: block; width: fit-content; margin: 0 0 16px; padding: 10px 12px; font-size: 11px; line-height: 1.6; white-space: normal; }
+.reset-secret { padding: 10px; border: 1px solid #6a5521; border-radius: 7px; background: #241e0f; color: #f1d589; overflow-wrap: anywhere; }
 
 /* Consent */
 .consent-box { border: 1px solid var(--line); background: #fafbfa; border-radius: 8px; padding: 14px; margin: 14px 0; }
@@ -226,6 +234,15 @@ a { text-decoration: none; }
 .guide-list { list-style: none; padding: 0; margin: 14px 0; }
 .guide-list li { display: flex; align-items: center; gap: 10px; border-bottom: 1px solid #f0f2f0; padding: 10px 0; font-size: 11px; line-height: 1.5; }
 .guide-list li span { width: 27px; height: 27px; flex: none; border-radius: 8px; background: #eaf3ee; color: var(--green); display: grid; place-items: center; }
+.topic-heading { margin: 8px 0; font-size: 15px; }
+.topic-help { margin: 0 0 14px; color: var(--muted); font-size: 11px; }
+.topic-selection { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 14px 0 22px; }
+.topic-option { display: flex; align-items: center; gap: 9px; min-height: 44px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px; cursor: pointer; font-size: 11px; }
+.topic-option:has(input:checked) { border-color: #4e9b75; background: #edf6ef; }
+.topic-option input { accent-color: var(--green); }
+.recording-topics { width: min(720px, 100%); margin: 0 auto 18px; text-align: left; }
+.recording-topics strong { display: block; margin-bottom: 8px; font-size: 12px; }
+.topic-chips { display: flex; flex-wrap: wrap; gap: 7px; }
 
 /* Recording studio */
 .recording-studio {
@@ -290,6 +307,13 @@ a { text-decoration: none; }
 .studio-file { display: grid; gap: 8px; max-width: 640px; margin: 25px auto 0; padding-top: 18px; text-align: left; border-top: 1px solid #ffffff16; }
 .studio-file label { font-size: 12px; color: #bac9c5; }
 .studio-file input { color: #d7e1de; font-size: 12px; }
+.mic-test-panel { width: min(720px, 100%); margin: 0 auto; }
+.mic-test-panel h2 { margin: 12px 0 7px; font-size: 19px; }
+.mic-test-panel > p { color: #bec9c6; font-size: 12px; line-height: 1.6; }
+.test-feedback { margin: 22px auto 14px; padding: 15px 18px; border: 1px solid #435154; border-radius: 10px; background: #172124; text-align: left; }
+.test-feedback h3 { margin: 0 0 9px; font-size: 13px; }
+.test-feedback ul { margin: 0; padding-left: 20px; color: #d1dcda; font-size: 12px; line-height: 1.7; }
+.test-audio-preview { width: min(520px, 100%); margin: 8px auto 18px; }
 
 /* Admin tabs */
 .admin-tabs { display: flex; gap: 7px; flex-wrap: wrap; margin: 15px 0; }
@@ -297,9 +321,6 @@ a { text-decoration: none; }
 .filter-chip.selected { background: #eaf3ee; color: var(--green); }
 
 /* Callouts */
-.demo-callout { background: #f1f6f2; border-left: 3px solid #579276; padding: 11px 13px; border-radius: 5px; font-size: 10px; color: #52645a; line-height: 1.55; margin: 12px 0; }
-.demo-callout.warning { background: #fff6e9; border-left-color: #dd9d4f; }
-.demo-note { font-size: 10px; color: #67818e; }
 
 /* Status pills */
 .status-pill { display: inline-block; padding: 4px 8px; border-radius: 12px; background: #e5f6f8; color: #087d93; font-size: 8px; white-space: nowrap; }
@@ -338,10 +359,222 @@ a { text-decoration: none; }
   .welcome-hero h1 { font-size: 22px; }
   .hero-art { right: -65px; opacity: .35; }
   .form-grid { grid-template-columns: 1fr; }
+  .topic-selection { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .record-clock { font-size: 50px; }
 }
 
 @media (max-width: 440px) {
   .catalog-grid, .project-grid { grid-template-columns: 1fr; }
   .metrics-grid { grid-template-columns: 1fr 1fr; }
+}
+
+/* AfriCorpus AI brand: deep charcoal workspace, teal navigation, warm gold accents. */
+:root {
+  --green: #e7a91d;
+  --ink: #e8e9e4;
+  --muted: #a2a49b;
+  --line: #30352f;
+  --bg: #090b10;
+  color-scheme: dark;
+}
+body { background: #090b10; color: var(--ink); }
+.sidebar {
+  background: linear-gradient(180deg, #073d37 0%, #075347 54%, #06443d 100%);
+  border-right-color: #2a7868;
+}
+.brand-mark {
+  border-color: #f6b72577;
+  background: linear-gradient(145deg, #f3b51f, #db7d12);
+  color: #10221e;
+}
+.brand-mark svg { stroke: #fff3c4; }
+.brand-mark b { font: 800 20px Manrope, sans-serif; text-shadow: none; }
+.brand-copy strong { letter-spacing: .02em; }
+.brand-copy strong span { color: #f1b322; }
+.brand-copy small { color: #9cc9bd; }
+.workspace-label, .nav-group-label { color: #9bc6b8; }
+.workspace-label i { background: #f1b322; }
+.nav-link { color: #d0e3dc; }
+.nav-link:hover { background: #ffffff18; }
+.nav-link.active { background: linear-gradient(90deg, #eeb121, #d98b12); color: #172019; box-shadow: 0 6px 18px #001d1855; }
+.avatar { background: #e8b537; color: #17372f; }
+.main-column { background: #090b10; }
+.topbar { background: #0b0d12ed; border-bottom-color: #252a2b; box-shadow: none; }
+.mobile-menu { color: #f0b323; }
+.switch { border-color: #353a38; background: #111419; }
+.switch button { color: #a2a49b; }
+.switch button.on { background: #302710; color: #f2b523; }
+.content { max-width: 1320px; }
+.page-footer { border-color: #252a2b; color: #777d78; }
+.page-footer b { color: #f0b323; }
+.eyebrow { color: #f0b323; }
+.page-heading h1 { color: #f0eee6; }
+.page-heading p { color: #a2a49b; }
+.primary-button { background: linear-gradient(135deg, #f2b51d, #d98710); color: #171911; box-shadow: 0 5px 14px #d9951524; }
+.primary-button:hover:not(:disabled) { box-shadow: 0 8px 20px #d9951533; }
+.secondary-button { border-color: #4b4634; color: #e7c261; background: #171811; }
+.secondary-button:hover { border-color: #dba51c; background: #282313; color: #ffcb43; }
+.text-button { color: #f0b323; }
+.danger-button { border-color: #563438; background: #211618; color: #f09186; }
+.workspace-card, .metric-card, .entry-card, .language-card, .project-card, .panel {
+  background: #12151a; border-color: #2b3031; color: #e8e9e4; box-shadow: 0 10px 28px #0003;
+}
+.workspace-card h2, .panel h3, .entry-card h2 { color: #f0eee6; }
+.workspace-card p, .entry-card p { color: #a2a49b; }
+.metric-card span, .language-card p, .project-card small { color: #969a91; }
+.metric-card strong { color: #f0b323; }
+.form-card, .auth-card { color: #e8e9e4; }
+.field label, .speaker-field label { color: #d1d2c9; }
+.field input, .field select, .field textarea, .speaker-field input, .speaker-field select, .speaker-field textarea {
+  border-color: #343a39; background: #0d1014; color: #e8e9e4;
+}
+.field input:focus, .field textarea:focus, .field select:focus { border-color: #d9a619; box-shadow: 0 0 0 3px #d9a61922; }
+.phone-field { border-color: #343a39; }
+.phone-field span { background: #181b1c; color: #a2a49b; border-color: #343a39; }
+.consent-box { border-color: #343a39; background: #12151a; }
+.consent-box h3 { color: #ecebe4; }
+.check-row { color: #c5c7bf; }
+.check-row input { accent-color: #e7a91d; }
+.welcome-hero {
+  min-height: 260px; padding: 36px 42px; border-radius: 18px;
+  background: linear-gradient(115deg, #161811 0%, #1e211a 58%, #151a17 100%);
+  color: #f3f0df; border-color: #38392c; box-shadow: 0 18px 42px #0005;
+}
+.welcome-hero h1 { color: #f3d166; font-family: 'Noto Sans Ethiopic', Manrope, sans-serif; line-height: 1.4; }
+.welcome-hero p { color: #c6c4b7; }
+.welcome-hero .eyebrow { color: #e4aa1e; }
+.hero-art {
+  width: 255px; height: 155px; right: 55px; top: 50px; border-radius: 16px;
+  border-color: #8a7b3b55; background: linear-gradient(145deg, #151a17dd, #11161acc);
+  color: #e9b31c; font-size: 34px;
+}
+.hero-art i { color: #4a725d; opacity: .17; }
+.hero-art span { color: #f3b51f; }
+.afri-mark { position: relative; z-index: 1; display: flex; align-items: baseline; font: 800 19px Manrope, sans-serif; letter-spacing: .01em; color: #f2a817; }
+.afri-mark span { color: #ebe6d2; }
+.afri-mark small { margin-left: 5px; color: #e8b326; font-size: 12px; }
+.admin-entry { background: linear-gradient(145deg, #171811, #12151a); }
+.language-chip { background: #1b211c; border-color: #344238; color: #c7d2bd; }
+.language-symbol { background: #272416; color: #f0b323; }
+.catalog-filters { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(240px, 1.3fr) auto; align-items: end; gap: 14px; }
+.catalog-filters .field { margin: 0; }
+.catalog-count { align-self: center; margin: 0; color: var(--muted); font-size: 11px; white-space: nowrap; }
+.language-card-head small { color: var(--muted); font: 600 10px 'DM Sans', sans-serif; }
+.language-country-list { display: flex; flex-wrap: wrap; gap: 5px; min-height: 24px; margin: 8px 0 12px; }
+.language-country-list .language-chip { padding: 4px 7px; font-size: 9px; }
+.catalog-source { margin-top: 22px; color: var(--muted); font-size: 10px; line-height: 1.6; }
+@media (max-width: 760px) { .catalog-filters { grid-template-columns: 1fr; } .catalog-count { white-space: normal; } }
+.tag { background: #302711; color: #e6ba4e; }
+.progress-track { background: #292d2b; }
+.progress-track i { background: linear-gradient(90deg, #f0bd36, #d88510); }
+.project-card.selected { border-color: #d9a619; box-shadow: 0 0 0 2px #d9a61920; }
+.speaker-field { border-color: #343a39; }
+.speaker-field legend { color: #e7b12a; }
+.guide-list li { border-color: #292e2d; color: #d6d7cf; }
+.guide-list li span { background: #292416; color: #edb72c; }
+.topic-option { border-color: #343a39; color: #d6d7cf; }
+.topic-option:has(input:checked) { border-color: #b58d23; background: #292416; }
+.topic-option input { accent-color: #e7a91d; }
+.topic-help { color: #a2a49b; }
+.filter-chip { border-color: #343a39; background: #12151a; color: #b7b9b1; }
+.filter-chip.selected { background: #302711; color: #efbd3f; }
+.status-pill { background: #173a30; color: #8fddb4; }
+.status-pill.progress { background: #202733; color: #a5b4ce; }
+.status-pill.review { background: #2d2235; color: #d0a4df; }
+.status-pill.pending { background: #342915; color: #ecc46b; }
+.status-pill.approved { background: #173a30; color: #8fddb4; }
+.panel { border-radius: 12px; }
+.toast { background: #163b30; color: #f1f2e8; }
+
+@media (max-width: 700px) {
+  .welcome-hero { padding: 24px; }
+  .hero-art { right: -105px; opacity: .25; }
+}
+
+/* Recovered AfriCorpus public landing page from the original app.js/styles.css. */
+.app-frame:has(.afri-landing) .sidebar,
+.app-frame:has(.afri-landing) .topbar,
+.app-frame:has(.afri-landing) .page-footer { display: none; }
+.app-frame:has(.afri-landing) .main-column { margin-left: 0; width: 100%; min-width: 0; }
+.app-frame:has(.afri-landing) .content { max-width: none; padding: 0; }
+.afri-landing {
+  --landing-bronze: #df9b55;
+  --landing-text: #f4f6f7;
+  min-height: 100vh; display: flex; flex-direction: column; overflow: hidden;
+  color: var(--landing-text);
+  background: radial-gradient(ellipse at 84% 13%, #df9b551f, transparent 32%), radial-gradient(ellipse at 12% 70%, #516b7c24, transparent 35%), linear-gradient(145deg, #090e12, #11191f 58%, #0b1116);
+  font-family: 'DM Sans', 'Noto Sans Ethiopic', sans-serif;
+}
+.afri-landing.amharic { font-family: 'Noto Sans Ethiopic', 'DM Sans', sans-serif; }
+.afri-landing-nav {
+  position: relative; z-index: 2; display: flex; align-items: center; justify-content: space-between; gap: 22px;
+  min-height: 78px; padding: 12px clamp(18px, 4vw, 72px); background: #090e12f2;
+  border-bottom: 1px solid #df9b5533; box-shadow: 0 10px 35px #0003;
+}
+.afri-wordmark { display: block; flex: 0 1 205px; min-width: 170px; line-height: 0; }
+.afri-wordmark svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 3px 10px #0008); }
+.afri-landing-actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 10px; }
+.afri-language-switch { display: flex; align-items: center; gap: 8px; margin-right: 5px; color: #9caab2; font-size: 12px; white-space: nowrap; }
+.afri-language-switch button { border: 0; padding: 8px 3px; background: transparent; color: #d1d8dd; font: inherit; font-weight: 650; cursor: pointer; }
+.afri-language-switch button[aria-pressed='true'] { color: #efb979; }
+.afri-button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px; min-height: 43px; padding: 10px 16px;
+  border: 1px solid transparent; border-radius: 8px; text-decoration: none; font-size: 13px; font-weight: 750;
+  transition: transform .18s ease, background .18s ease, border-color .18s ease;
+}
+.afri-button:hover { transform: translateY(-1px); }
+.afri-button-primary { color: #21160c; background: linear-gradient(135deg, #f2bd7c, #c67b35); box-shadow: 0 8px 22px #bf743040; }
+.afri-button-primary:hover { background: linear-gradient(135deg, #ffd49d, #d8914e); }
+.afri-button-secondary { color: #edf1f4; background: #182229; border-color: #46545d; }
+.afri-button-secondary:hover { background: #202c33; border-color: #df9b55; }
+.afri-button-outline { color: #f5d6b2; background: #df9b5512; border-color: #df9b559e; }
+.afri-button-outline:hover { background: #df9b5529; }
+.afri-landing-main { width: min(1320px, 100%); margin: auto; padding: 28px clamp(18px, 4.2vw, 82px) 48px; }
+.afri-hero {
+  display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(310px, .85fr); align-items: center; gap: clamp(30px, 6vw, 78px);
+  min-height: 598px; padding: clamp(32px, 5vw, 66px); border: 1px solid #df9b5540; border-radius: 24px;
+  background: radial-gradient(ellipse at 77% 15%, #df9b5521, transparent 35%), linear-gradient(135deg, #151c21 0%, #20272c 52%, #12191e 100%);
+  box-shadow: 0 24px 60px #0006;
+}
+.afri-hero-copy { max-width: 670px; }
+.afri-eyebrow { margin: 0 0 18px; color: #efb979; font-size: 10px; font-weight: 850; letter-spacing: 1.35px; }
+.afri-hero h1 { max-width: 720px; margin: 0; color: #f4f6f7; font: 800 clamp(38px, 4.5vw, 62px)/1.26 'Noto Sans Ethiopic', 'Manrope', sans-serif; letter-spacing: -.8px; text-shadow: 0 2px 18px #0003; }
+.afri-hero-description { max-width: 610px; margin: 20px 0 0; color: #c3cdd2; font-size: clamp(14px, 1.3vw, 17px); line-height: 1.85; }
+.afri-cover-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+.afri-signal-card {
+  position: relative; overflow: hidden; padding: 22px; border: 1px solid #df9b5552; border-radius: 18px;
+  background: linear-gradient(145deg, #252d32f2, #0c1115f2); box-shadow: 0 18px 48px #0006;
+}
+.afri-signal-card::after { position: absolute; right: -75px; bottom: -120px; width: 250px; height: 250px; border: 1px solid #df9b552e; border-radius: 50%; box-shadow: 0 0 0 30px #ffffff08, 0 0 0 64px #df9b5509; content: ''; }
+.afri-signal-card-top { position: relative; z-index: 1; display: flex; justify-content: space-between; gap: 12px; color: #c4cdd2; font-size: 9px; letter-spacing: .6px; white-space: nowrap; }
+.afri-signal-card-top b { color: #f1bd7c; }
+.afri-large-brand { position: relative; z-index: 1; display: grid; place-items: center; min-height: 190px; margin: 10px 0 15px; padding: 10px; border-top: 1px solid #ffffff1a; border-bottom: 1px solid #ffffff1a; }
+.afri-large-brand svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 7px 18px #0009); }
+.afri-signal-card-bottom { position: relative; z-index: 1; display: grid; gap: 10px; color: #c4cdd2; font-size: 10px; }
+.afri-signal-card-bottom span { display: flex; align-items: center; gap: 9px; }
+.afri-signal-card-bottom b { color: #efb979; font: 700 10px 'DM Sans', sans-serif; }
+.afri-landing-footer { padding: 20px clamp(18px, 4vw, 72px); border-top: 1px solid #303a40; background: #0d1317; color: #9caab2; font-size: 10px; }
+.afri-landing-footer b { color: #efb979; }
+.afri-landing :focus-visible { outline: 3px solid #f0b75a; outline-offset: 3px; }
+@media (max-width: 900px) {
+  .afri-hero { min-height: 0; gap: 28px; }
+  .afri-signal-card { padding: 17px; }
+  .afri-large-brand { min-height: 150px; }
+}
+@media (max-width: 700px) {
+  .afri-landing-nav { flex-wrap: wrap; justify-content: center; padding: 14px 18px; }
+  .afri-wordmark { flex: 0 1 200px; }
+  .afri-landing-actions { width: 100%; justify-content: center; gap: 7px; }
+  .afri-landing-actions .afri-button { padding: 8px 10px; font-size: 11px; }
+  .afri-hero { grid-template-columns: 1fr; padding: 28px 24px; border-radius: 17px; }
+  .afri-hero h1 { font-size: clamp(32px, 8vw, 42px); }
+  .afri-signal-card { width: 100%; max-width: 520px; margin: 0 auto; }
+  .afri-large-brand { min-height: 130px; }
+}
+@media (max-width: 480px) {
+  .afri-landing-actions .afri-button { flex: 1 1 auto; }
+  .afri-landing-main { padding: 14px 12px 28px; }
+  .afri-hero { padding: 24px 18px; }
+  .afri-cover-actions { display: grid; }
+  .afri-signal-card { padding: 15px; }
 }

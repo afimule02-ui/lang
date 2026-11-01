@@ -6,14 +6,19 @@
   </div>
 </div>
 
+@if (registered) { <p class="status-pill approved login-success">{{ tr.t('Account created. Sign in with your phone number and password.') }}</p> }
+
 <form class="workspace-card auth-card" (ngSubmit)="submit()">
   <div class="field">
     <label>{{ tr.t('Phone number') }}</label>
     <div class="phone-field">
-      <span>+251</span>
-      <input [(ngModel)]="phone" name="phone" placeholder="9XX XXX XXX" required />
+      <select [(ngModel)]="dialCode" name="dialCode" [attr.aria-label]="tr.t('Country calling code')">
+        @for (country of phoneCountries; track country.code) { <option [value]="country.dialCode">+{{ country.dialCode }} · {{ country.name }}</option> }
+      </select>
+      <input [(ngModel)]="phone" name="phone" placeholder="Phone number" inputmode="tel" required />
     </div>
   </div>
+  <div class="login-links"><a routerLink="/forgot-password" class="text-button">{{ tr.t('Forgot password?') }}</a></div>
   <div class="field">
     <label>{{ tr.t('Password') }}</label>
     <input type="password" [(ngModel)]="password" name="password" required />

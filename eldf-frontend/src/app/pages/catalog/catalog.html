@@ -1,22 +1,48 @@
 <div class="page-heading">
   <div>
-    <div class="eyebrow">DATASETS</div>
+    <div class="eyebrow">{{ tr.t('AFRICA · 54 COUNTRIES') }}</div>
     <h1>{{ tr.t('Language catalog') }}</h1>
-    <p>{{ tr.t('Explore Ethiopian language collections.') }}</p>
+    <p>{{ tr.t('Explore languages across Africa.') }}</p>
   </div>
 </div>
 
-<div class="catalog-grid">
-  @for (p of projects; track p.id) {
-    <article class="language-card">
-      <div class="language-card-head">
-        <span class="language-symbol">{{ p.name[0] }}</span>
-        <span class="tag">{{ tr.t('Demo data') }}</span>
-      </div>
-      <h3>{{ tr.t(p.name) }}</h3>
-      <p>{{ p.id }} · {{ p.progress }}% {{ tr.t('Your progress') }}</p>
-      <div class="progress-track"><i [style.width.%]="p.progress"></i></div>
-      <a routerLink="/project" class="text-button">{{ tr.t('Open') }} →</a>
-    </article>
+<section class="workspace-card catalog-filters">
+  <label class="field">
+    <span>{{ tr.t('Country or territory') }}</span>
+    <select [(ngModel)]="countryCode" name="country" (ngModelChange)="resetPaging()">
+      <option value="all">{{ tr.t('All African countries') }}</option>
+      @for (country of countries; track country.code) { <option [value]="country.code">{{ country.name }} · {{ country.languages.length }}</option> }
+    </select>
+  </label>
+  <label class="field">
+    <span>{{ tr.t('Search languages or countries') }}</span>
+    <input [(ngModel)]="search" (ngModelChange)="resetPaging()" name="search" [placeholder]="tr.t('Start typing a language name')" />
+  </label>
+  <p class="catalog-count">{{ languageCountLabel }} · {{ countries.length }} {{ tr.t('countries represented') }}</p>
+</section>
+
+@if (loading) { <section class="workspace-card">{{ tr.t('Loading') }}…</section> }
+@else if (error) { <section class="workspace-card form-error">{{ tr.t(error) }}</section> }
+@else {
+  <div class="catalog-grid">
+    @for (language of visibleLanguages; track language.name) {
+      <article class="language-card">
+        <div class="language-card-head">
+          <span class="language-symbol">{{ language.name[0] }}</span>
+          @if (language.iso639_3) { <small>{{ language.iso639_3 }}</small> }
+        </div>
+        <h3>{{ language.name }}</h3>
+        <p>{{ language.level === 'dialect' ? tr.t('Dialect') : tr.t('Language collection') }}</p>
+        <div class="language-country-list">
+          @for (country of language.countries.slice(0, 3); track country) { <span class="language-chip">{{ country }}</span> }
+          @if (language.countries.length > 3) { <span class="language-chip">+{{ language.countries.length - 3 }}</span> }
+        </div>
+        <a routerLink="/project" (click)="selectLanguage(language)" class="text-button">{{ tr.t('Collect this language') }} →</a>
+      </article>
+    } @empty { <section class="workspace-card">{{ tr.t('No languages match this search.') }}</section> }
+  </div>
+  @if (countryCode === 'all' && visibleCount < filteredLanguages.length) {
+    <div class="form-footer"><button class="secondary-button" type="button" (click)="showMore()">{{ tr.t('Show more languages') }}</button></div>
   }
-</div>
+}
+<p class="catalog-source">{{ tr.t('Catalog source') }}: {{ source }} · CC BY 4.0. {{ tr.t('Please confirm local names and varieties with each language community before collecting.') }}</p>

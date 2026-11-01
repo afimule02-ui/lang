@@ -13,40 +13,39 @@ export interface User {
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
-  readonly API = 'http://localhost:8001';
+  private readonly API = '/api/auth';
   user = signal<User | null>(null);
   lang = signal<'am' | 'en'>('am');
+  readonly ready: Promise<void>;
 
   constructor(private http: HttpClient, private router: Router) {
-    this.restoreSession();
+    this.ready = this.restoreSession();
   }
 
-  private async restoreSession() {
+  private async restoreSession(): Promise<void> {
     try {
-      const res: any = await firstValueFrom(this.http.get(`${this.API}/api/auth/me`, { withCredentials: true }));
+      const res: any = await firstValueFrom(this.http.get(`${this.API}/me`, { withCredentials: true }));
       this.user.set(res.user);
       this.lang.set(res.user.language === 'en' ? 'en' : 'am');
     } catch {}
   }
 
   async register(data: FormData): Promise<User> {
-    const res: any = await firstValueFrom(this.http.post(`${this.API}/api/auth/register`, data, { withCredentials: true }));
-    this.user.set(res.user);
-    this.lang.set(res.user.language === 'en' ? 'en' : 'am');
+    const res: any = await firstValueFrom(this.http.post(`${this.API}/register`, data, { withCredentials: true }));
     return res.user;
   }
 
   async login(data: FormData): Promise<User> {
-    const res: any = await firstValueFrom(this.http.post(`${this.API}/api/auth/login`, data, { withCredentials: true }));
+    const res: any = await firstValueFrom(this.http.post(`${this.API}/login`, data, { withCredentials: true }));
     this.user.set(res.user);
     this.lang.set(res.user.language === 'en' ? 'en' : 'am');
     return res.user;
   }
 
-  async logout() {
-    await firstValueFrom(this.http.post(`${this.API}/api/auth/logout`, {}, { withCredentials: true })).catch(() => {});
+  async logout(navigate = true) {
+    await firstValueFrom(this.http.post(`${this.API}/logout`, {}, { withCredentials: true })).catch(() => {});
     this.user.set(null);
-    this.router.navigate(['/']);
+    if (navigate) this.router.navigate(['/']);
   }
 
   setLang(l: 'am' | 'en') {

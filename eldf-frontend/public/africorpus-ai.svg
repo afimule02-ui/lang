@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 132" role="img" aria-labelledby="title desc">
+  <title id="title">AfriCorpus AI</title>
+  <desc id="desc">African language and speech datasets</desc>
+  <defs>
+    <linearGradient id="bronze" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#f0bb84"/><stop offset="38%" stop-color="#d9924f"/><stop offset="72%" stop-color="#b9712f"/><stop offset="100%" stop-color="#8d4f1a"/></linearGradient>
+    <linearGradient id="slate" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#3d6c90"/><stop offset="55%" stop-color="#2b5273"/><stop offset="100%" stop-color="#1b3a53"/></linearGradient>
+    <linearGradient id="bronzeText" x1="0%" y1="0%" x2="0%" y2="100%"><stop stop-color="#f6cc9b"/><stop offset="48%" stop-color="#d9934f"/><stop offset="100%" stop-color="#a55f22"/></linearGradient>
+    <linearGradient id="slateText" x1="0%" y1="0%" x2="0%" y2="100%"><stop stop-color="#6f93ad"/><stop offset="50%" stop-color="#3f6786"/><stop offset="100%" stop-color="#26455f"/></linearGradient>
+    <path id="africa" d="M85,33 L134,28 L173,26 L200,52 L227,54 L256,57 L289,58 L304,68 L322,115 L334,145 L355,162 L365,170 L400,174 L366,221 L336,254 L333,270 L340,304 L309,342 L296,376 L288,398 L258,421 L227,425 L218,420 L197,359 L189,281 L182,259 L168,230 L170,210 L150,208 L135,196 L115,201 L95,203 L57,197 L44,185 L20,150 L28,132 L28,110 L39,96 L64,63 L75,46 Z"/>
+    <clipPath id="africaClip"><use href="#africa"/></clipPath>
+    <filter id="depth" x="-14%" y="-14%" width="132%" height="132%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#000" flood-opacity=".4"/></filter>
+  </defs>
+  <g transform="translate(4 4) scale(.253)" filter="url(#depth)">
+    <g clip-path="url(#africaClip)"><rect width="420" height="460" fill="url(#bronze)"/><path d="M300 16h132v456H112l58-132z" fill="url(#slate)"/></g>
+    <use href="#africa" fill="none" stroke="#f3c58d" stroke-width="3.4" stroke-linejoin="round" opacity=".5"/>
+    <path d="M370 299c9 6 9 28 2 45-7 17-16 30-22 28-6-2-5-21 2-38 7-17 14-37 18-35Z" fill="url(#slate)"/>
+    <g stroke="#2f5674" stroke-width="3" stroke-linecap="round" opacity=".92">
+      <path d="m150 299-26 22 44 16-29 17m-15-33 15 33m111-54 48-10 13 50-44 35-33-30 16-45 61 40-77-10m80-232 36-26 38-26" fill="none"/>
+    </g>
+    <g fill="#2f5674"><circle cx="150" cy="299" r="6"/><circle cx="168" cy="337" r="5.5"/><circle cx="139" cy="354" r="4"/><circle cx="288" cy="289" r="6.5"/><circle cx="257" cy="374" r="5.5"/><circle cx="340" cy="42" r="6.5"/></g>
+    <g fill="#ef8e2c"><circle cx="124" cy="321" r="4.5"/><circle cx="240" cy="300" r="7.5"/><circle cx="301" cy="339" r="6.5"/><circle cx="224" cy="344" r="4.5"/><circle cx="378" cy="16" r="8.5"/></g>
+    <path d="M100 76h124q14 0 14 14v46q0 14-14 14h-92l-28 28v-28h-4q-14 0-14-14V90q0-14 14-14Z" fill="none" stroke="#2b4e69" stroke-width="9.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <g fill="#22384b"><rect x="95" y="105" width="6" height="16" rx="3"/><rect x="111" y="99" width="6" height="28" rx="3"/><rect x="127" y="92" width="6" height="42" rx="3"/><rect x="143" y="87" width="6" height="52" rx="3"/><rect x="159" y="91" width="6" height="44" rx="3"/><rect x="175" y="85" width="6" height="56" rx="3"/><rect x="191" y="95" width="6" height="36" rx="3"/><rect x="207" y="101" width="6" height="24" rx="3"/><rect x="223" y="106" width="6" height="14" rx="3"/></g>
+  </g>
+  <text x="124" y="62" font-family="Manrope, Arial, sans-serif" font-weight="900" font-size="47" letter-spacing=".5"><tspan fill="url(#bronzeText)">AFRI</tspan><tspan fill="url(#slateText)">CORPUS</tspan></text>
+  <text x="124" y="104" font-family="Manrope, Arial, sans-serif" font-weight="900" font-size="36" fill="url(#slateText)" letter-spacing="1">AI</text>
+  <rect x="178" y="78" width="248" height="4" rx="2" fill="url(#slateText)" opacity=".75"/><rect x="178" y="86" width="190" height="3" rx="1.5" fill="#ef8e2c"/>
+  <text x="178" y="106" font-family="Arial, sans-serif" font-weight="700" font-size="13" fill="#8fa6b4" letter-spacing=".8">POWERING AFRICAN LANGUAGE</text>
+  <text x="178" y="122" font-family="Arial, sans-serif" font-weight="700" font-size="13" fill="#8fa6b4" letter-spacing=".8">&amp; SPEECH DATASETS</text>
+</svg>
