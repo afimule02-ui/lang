@@ -1,16 +1,47 @@
 services:
-  eldf:
-    build: .
+  eldf-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: eldf-api
     restart: unless-stopped
     env_file:
       - .env
     environment:
       ELDF_URLS: http://0.0.0.0:8001
       ELDF_DATA_DIR: /data
-    ports:
-      - "8001:8001"
+      ASPNETCORE_ENVIRONMENT: Production
+    expose:
+      - "8001"
     volumes:
       - eldf-data:/data
+    networks:
+      - eldf-net
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: eldf-caddy
+    restart: unless-stopped
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?Set SITE_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - eldf-api
+    networks:
+      - eldf-net
+
+networks:
+  eldf-net:
+    driver: bridge
 
 volumes:
   eldf-data:
+  caddy-data:
+  caddy-config:
