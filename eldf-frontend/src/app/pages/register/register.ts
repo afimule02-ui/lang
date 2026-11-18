@@ -18,6 +18,9 @@ export class RegisterComponent {
   phoneCountries = AFRICAN_PHONE_COUNTRIES;
   password = '';
   passwordConfirm = '';
+  showPassword = false;
+  showPasswordConfirm = false;
+  showStaffCode = false;
   language: 'am' | 'en' = 'am';
   referralCode = '';
   staffCode = '';

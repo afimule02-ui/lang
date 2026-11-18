@@ -8,10 +8,15 @@ using Microsoft.EntityFrameworkCore;
 var builder = WebApplication.CreateBuilder(args);
 var connectionString = Environment.GetEnvironmentVariable("ELDF_SQLSERVER_CONNECTION_STRING")
     ?? builder.Configuration.GetConnectionString("DefaultConnection");
-if (string.IsNullOrWhiteSpace(connectionString))
-    throw new InvalidOperationException("Set ELDF_SQLSERVER_CONNECTION_STRING (or ConnectionStrings:DefaultConnection) before starting the API.");
-
-builder.Services.AddDbContext<EldfDbContext>(options => options.UseSqlServer(connectionString));
+var databaseConfigured = !string.IsNullOrWhiteSpace(connectionString);
+// Register the service even when no connection string is present. Minimal API uses DI registrations
+// to infer EldfDbContext parameters; without this registration it treats them as request bodies and
+// fails endpoint construction, which also breaks database-independent routes such as /health.
+builder.Services.AddDbContext<EldfDbContext>(options =>
+{
+    if (databaseConfigured)
+        options.UseSqlServer(connectionString!);
+});
 var origins = (Environment.GetEnvironmentVariable("ELDF_ALLOWED_ORIGINS") ?? "")
     .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 if (origins.Length == 0) origins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>() ?? [];
@@ -51,12 +56,31 @@ builder.Services.AddSingleton(sp =>
 builder.Services.AddSingleton<AudioStoragePaths>();
 builder.Services.AddSingleton<AudioPipeline>();
 builder.Services.AddSingleton<AudioProcessingQueue>();
-builder.Services.AddHostedService<AudioProcessingWorker>();
+if (databaseConfigured)
+    builder.Services.AddHostedService<AudioProcessingWorker>();
 
 var app = builder.Build();
 app.UseCors();
+app.Use(async (context, next) =>
+{
+    if (!databaseConfigured && context.Request.Path.StartsWithSegments("/api"))
+    {
+        context.Response.StatusCode = StatusCodes.Status503ServiceUnavailable;
+        await context.Response.WriteAsJsonAsync(new
+        {
+            title = "Database configuration missing",
+            status = StatusCodes.Status503ServiceUnavailable,
+            detail = "Database-backed API routes are unavailable until a database connection is configured."
+        });
+        return;
+    }
+
+    await next();
+});
 app.UseDefaultFiles();
 app.UseStaticFiles();
+if (!databaseConfigured)
+    app.Logger.LogWarning("Database configuration is missing; health and static routes remain available, and /api requests return 503.");
 var dataDirectory = Path.GetFullPath(Environment.GetEnvironmentVariable("ELDF_DATA_DIR") ?? builder.Configuration["DataDirectory"] ?? "../../eldf-server-data", app.Environment.ContentRootPath);
 Directory.CreateDirectory(dataDirectory);
 var audioDirectory = Path.Combine(dataDirectory, "recordings");
@@ -67,15 +91,48 @@ var maxSeconds = builder.Configuration.GetValue("Audio:MaxSeconds", 3600);
 var ffmpegPath = builder.Configuration["Audio:FfmpegPath"] ?? "ffmpeg";
 var ffprobePath = builder.Configuration["Audio:FfprobePath"] ?? "ffprobe";
 
-// Creates the initial tables for a new database. Use EF migrations for later schema changes.
-using (var scope = app.Services.CreateScope())
+// Schema changes are managed exclusively through EF Core migrations. Normal application startup
+// never creates or migrates a database; an operator must explicitly set this process environment
+// variable to "true" for a deliberate migration run against the already-configured target.
+var applyMigrations = string.Equals(
+    Environment.GetEnvironmentVariable("ELDF_APPLY_MIGRATIONS"),
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+var migrationsOnly = string.Equals(
+    Environment.GetEnvironmentVariable("ELDF_MIGRATIONS_ONLY"),
+    "true",
+    StringComparison.OrdinalIgnoreCase);
+
+if (migrationsOnly && (!applyMigrations || !databaseConfigured))
+    throw new InvalidOperationException("ELDF_MIGRATIONS_ONLY requires ELDF_APPLY_MIGRATIONS=true and a configured database.");
+
+if (applyMigrations && databaseConfigured)
 {
+    app.Logger.LogWarning("Database migrations explicitly enabled with ELDF_APPLY_MIGRATIONS=true.");
+    using var scope = app.Services.CreateScope();
     var db = scope.ServiceProvider.GetRequiredService<EldfDbContext>();
-    await db.Database.EnsureCreatedAsync();
     await db.Database.MigrateAsync();
+    if (migrationsOnly)
+    {
+        app.Logger.LogInformation("Database migration completed; migrations-only process is exiting before hosted services start.");
+        return;
+    }
+}
+else if (applyMigrations)
+{
+    app.Logger.LogError("Database migrations were requested but skipped because database configuration is missing.");
+}
+else
+{
+    app.Logger.LogInformation("Database migrations skipped; set ELDF_APPLY_MIGRATIONS=true only for a deliberate migration run.");
 }
 
-app.MapGet("/health", () => Results.Json(new { status = "ok", service = "ELDF .NET API" }));
+app.MapGet("/health", () => Results.Json(new
+{
+    status = "ok",
+    service = "AfriLisan AI API",
+    database = databaseConfigured ? "configured_not_checked" : "not_configured"
+}));
 
 app.MapPost("/api/auth/register", async (HttpRequest request, EldfDbContext db) =>
 {
@@ -110,8 +167,25 @@ app.MapPost("/api/auth/login", async (HttpRequest request, EldfDbContext db) =>
     var phone = NormalizePhone(form["phone"].ToString());
     var user = await db.Users.SingleOrDefaultAsync(x => x.Phone == phone);
     if (user is null || !user.IsActive || !VerifyPassword(form["password"].ToString(), user.PasswordHash)) return Problem(401, "Phone number or password is incorrect.");
+    string? agentNotice = null;
+    if (user.Role == "agent")
+    {
+        var assignment = await db.ActivityEvents.AsNoTracking()
+            .Where(x => x.EventType == "Agent role assigned" && x.EntityType == "User" && x.EntityId == user.Id.ToString())
+            .OrderByDescending(x => x.CreatedAtUtc).FirstOrDefaultAsync();
+        if (assignment is not null)
+        {
+            var alreadyNotified = await db.ActivityEvents.AnyAsync(x => x.EventType == "Agent access notification delivered" && x.EntityType == "User" && x.EntityId == user.Id.ToString() && x.CreatedAtUtc >= assignment.CreatedAtUtc);
+            if (!alreadyNotified)
+            {
+                agentNotice = "Your account now has agent access. Sign in with your existing phone number and password. Your referral link is available in the Agent workspace.";
+                db.ActivityEvents.Add(new Eldf.Api.ActivityEvent { ActorUserId = user.Id, ActorRole = "agent", EventType = "Agent access notification delivered", EntityType = "User", EntityId = user.Id.ToString(), Details = "Agent workspace access notice shown after sign-in.", CreatedAtUtc = DateTime.UtcNow });
+                await db.SaveChangesAsync();
+            }
+        }
+    }
     await IssueSession(db, user, request, app);
-    return Results.Json(new { user = View(user) });
+    return Results.Json(new { user = View(user), agentNotice });
 });
 
 app.MapGet("/api/auth/me", async (HttpRequest request, EldfDbContext db) =>
@@ -133,18 +207,51 @@ app.MapPost("/api/auth/logout", async (HttpRequest request, EldfDbContext db) =>
     return Results.Json(new { ok = true });
 });
 
-app.MapPost("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
+app.MapGet("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
 {
     var user = await SessionAuth.CurrentUser(request, db);
     if (user is null) return Problem(401, "Please sign in to continue.");
+    if (user.Role != "contributor") return Problem(403, "Contributor access is required.");
+    var profiles = await db.Speakers.AsNoTracking().Where(x => x.UserAccountId == user.Id).OrderBy(x => x.Id).ToListAsync();
+    var result = new List<object>();
+    foreach (var speaker in profiles)
+    {
+        var consent = await db.SpeakerConsents.AsNoTracking().Where(x => x.UserAccountId == user.Id && x.SpeakerProfileId == speaker.Id)
+            .OrderByDescending(x => x.ConsentedAtUtc).FirstOrDefaultAsync();
+        result.Add(new { speakerId = speaker.SpeakerId, name = speaker.FullName, ageRange = speaker.AgeRange, gender = speaker.Gender,
+            educationLevel = speaker.Education, preferredLanguage = speaker.Language, region = speaker.Region, dialect = speaker.Dialect,
+            coreConsent = consent is { CoreConsent: true, WithdrawnAtUtc: null }, aiDevelopmentConsent = consent?.AiDevelopmentConsent ?? false,
+            researchSharingConsent = consent?.ResearchSharingConsent ?? false, consentVersion = consent?.ConsentVersion,
+            consentLanguage = consent?.Language });
+    }
+    return Results.Json(result);
+});
+
+app.MapPost("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
+{
+    const string consentVersion = "speaker-consent-v1";
+    var user = await SessionAuth.CurrentUser(request, db);
+    if (user is null) return Problem(401, "Please sign in to continue.");
+    if (user.Role != "contributor") return Problem(403, "Contributor access is required.");
     using var payload = await JsonDocument.ParseAsync(request.Body);
     if (!payload.RootElement.TryGetProperty("speakers", out var list) || list.ValueKind != JsonValueKind.Array || list.GetArrayLength() < 1)
         return Problem(422, "At least one speaker profile is required.");
     var entries = JsonSerializer.Deserialize<List<SpeakerInput>>(list.GetRawText(), new JsonSerializerOptions { PropertyNameCaseInsensitive = true }) ?? [];
     var existing = await db.Speakers.Where(x => x.UserAccountId == user.Id).ToListAsync();
+    var existingSpeakerIds = existing.Select(x => x.Id).ToArray();
+    var latestConsents = existingSpeakerIds.Length == 0 ? [] : await db.SpeakerConsents
+        .Where(x => x.UserAccountId == user.Id && existingSpeakerIds.Contains(x.SpeakerProfileId))
+        .OrderByDescending(x => x.ConsentedAtUtc).ToListAsync();
+    var latestConsentBySpeaker = latestConsents.GroupBy(x => x.SpeakerProfileId)
+        .ToDictionary(group => group.Key, group => group.First());
     for (var i = 0; i < entries.Count; i++)
     {
         var entry = entries[i];
+        if (string.IsNullOrWhiteSpace(entry.name) || string.IsNullOrWhiteSpace(entry.ageRange)
+            || string.IsNullOrWhiteSpace(entry.preferredLanguage))
+            return Problem(422, "Enter each speaker's name, age range, and preferred language.");
+        if (!entry.CoreConsent || entry.ConsentVersion != consentVersion)
+            return Problem(422, "Current speaker consent is required before continuing.");
         var speakerId = Limit(entry.speakerId, 40, $"SPK-{i + 1:000}");
         var speaker = existing.FirstOrDefault(x => x.SpeakerId == speakerId);
         if (speaker is null) { speaker = new SpeakerProfile { UserAccountId = user.Id, SpeakerId = speakerId }; db.Speakers.Add(speaker); }
@@ -153,36 +260,123 @@ app.MapPost("/api/speakers", async (HttpRequest request, EldfDbContext db) =>
         speaker.Language = Limit(entry.preferredLanguage, 160); speaker.Region = Limit(entry.region, 160);
         // The form stopped asking for a dialect; keep whatever an older client still sends.
         speaker.Dialect = Limit(entry.dialect, 160, speaker.Dialect);
+        var consentLanguage = entry.ConsentLanguage == "en" ? "en" : "am";
+        var alreadyRecorded = speaker.Id != 0 && latestConsentBySpeaker.TryGetValue(speaker.Id, out var latestConsent)
+            && latestConsent.WithdrawnAtUtc is null && latestConsent.ConsentVersion == consentVersion
+            && latestConsent.Language == consentLanguage && latestConsent.CoreConsent
+            && latestConsent.AiDevelopmentConsent == entry.AiDevelopmentConsent
+            && latestConsent.ResearchSharingConsent == entry.ResearchSharingConsent;
+        if (!alreadyRecorded) db.SpeakerConsents.Add(new SpeakerConsentRecord
+        {
+            UserAccountId = user.Id, Speaker = speaker, ConsentVersion = consentVersion,
+            Language = consentLanguage, CoreConsent = true,
+            AiDevelopmentConsent = entry.AiDevelopmentConsent, ResearchSharingConsent = entry.ResearchSharingConsent,
+            // Public release remains disabled until the consent license has received legal approval.
+            PublicReleaseConsent = false, ConsentedAtUtc = DateTime.UtcNow
+        });
     }
     await db.SaveChangesAsync();
     return Results.Json(new { ok = true, count = entries.Count });
+});
+
+app.MapPost("/api/speakers/{speakerId}/consent/withdrawal", async (string speakerId, HttpRequest request, EldfDbContext db) =>
+{
+    var user = await SessionAuth.CurrentUser(request, db);
+    if (user is null) return Problem(401, "Please sign in to continue.");
+    if (user.Role != "contributor") return Problem(403, "Contributor access is required.");
+    var speaker = await db.Speakers.SingleOrDefaultAsync(x => x.UserAccountId == user.Id && x.SpeakerId == speakerId);
+    if (speaker is null) return Problem(404, "Speaker profile was not found.");
+    var latest = await db.SpeakerConsents.Where(x => x.UserAccountId == user.Id && x.SpeakerProfileId == speaker.Id)
+        .OrderByDescending(x => x.ConsentedAtUtc).FirstOrDefaultAsync();
+    if (latest is not null && latest.WithdrawnAtUtc is null)
+    {
+        latest.WithdrawnAtUtc = DateTime.UtcNow;
+        db.ActivityEvents.Add(new Eldf.Api.ActivityEvent { ActorUserId = user.Id, ActorRole = user.Role, EventType = "Speaker consent withdrawn",
+            EntityType = "Speaker", EntityId = speakerId, Details = "Core speaker consent withdrawal recorded.", CreatedAtUtc = DateTime.UtcNow });
+        await db.SaveChangesAsync();
+    }
+    return Results.Json(new { ok = true, withdrawnAtUtc = latest?.WithdrawnAtUtc });
 });
 
 app.MapPost("/api/submissions", async (HttpRequest request, EldfDbContext db) =>
 {
     var user = await SessionAuth.CurrentUser(request, db);
     if (user is null) return Problem(401, "Please sign in to continue.");
+    if (user.Role != "contributor") return Problem(403, "Contributor access is required.");
     var form = await request.ReadFormAsync();
+    WorkDraft? sourceDraft = null;
+    var draftOwnerId = user.Id;
+    if (int.TryParse(form["draft_id"], out var draftId) && draftId > 0)
+    {
+        sourceDraft = await db.Drafts.SingleOrDefaultAsync(x => x.Id == draftId && (x.UserAccountId == user.Id || x.AssignedUserAccountId == user.Id));
+        if (sourceDraft is null) return Problem(404, "The assigned draft was not found.");
+        draftOwnerId = sourceDraft.UserAccountId;
+    }
+    try
+    {
+        var ids = JsonSerializer.Deserialize<List<string>>(form["speakers_json"].ToString()) ?? [];
+        if (ids.Count == 0) return Problem(422, "Select speakers with current consent before submitting.");
+        foreach (var speakerId in ids.Distinct(StringComparer.Ordinal))
+        {
+            var speaker = await db.Speakers.SingleOrDefaultAsync(x => x.UserAccountId == draftOwnerId && x.SpeakerId == speakerId);
+            if (speaker is null) return Problem(422, "A selected speaker profile was not found.");
+            var currentConsent = await db.SpeakerConsents.Where(x => x.UserAccountId == draftOwnerId && x.SpeakerProfileId == speaker.Id)
+                .OrderByDescending(x => x.ConsentedAtUtc).FirstOrDefaultAsync();
+            if (currentConsent is null || !currentConsent.CoreConsent || currentConsent.WithdrawnAtUtc is not null || currentConsent.ConsentVersion != "speaker-consent-v1")
+                return Problem(422, "Current speaker consent is required before submitting this recording.");
+        }
+    }
+    catch (JsonException) { return Problem(422, "Select speakers with current consent before submitting."); }
+    var audioSegments = form.Files.GetFiles("audio_segments");
     var file = form.Files.GetFile("file");
-    if (file is null || file.Length == 0 || file.Length > maxBytes) return Problem(413, "The recording is empty or larger than the server upload limit.");
+    if (audioSegments.Count > 0 && file is not null) return Problem(422, "Upload either one recording or its recording parts, not both.");
+    IReadOnlyList<IFormFile> audioFiles = audioSegments.Count > 0
+        ? audioSegments
+        : file is null ? Array.Empty<IFormFile>() : [file];
+    if (audioFiles.Count == 0 || audioFiles.Count > 100 || audioFiles.Any(item => item.Length == 0) || audioFiles.Sum(item => item.Length) > maxBytes)
+        return Problem(413, "The recording is empty, has too many parts, or is larger than the server upload limit.");
     var transcript = form["transcript"].ToString();
     var translation = form["translation"].ToString();
     if (string.IsNullOrWhiteSpace(transcript) || string.IsNullOrWhiteSpace(translation)) return Problem(422, "Add the transcription and translation before submitting.");
-    var safeExtension = Path.GetExtension(Path.GetFileName(file.FileName)).ToLowerInvariant();
+    var safeExtension = audioFiles.Count > 1 ? ".webm" : Path.GetExtension(Path.GetFileName(audioFiles[0].FileName)).ToLowerInvariant();
     if (safeExtension.Length > 10 || safeExtension.Any(c => !char.IsAsciiLetterOrDigit(c) && c != '.')) safeExtension = ".audio";
     var tempPath = Path.Combine(Path.GetTempPath(), $"eldf-{Guid.NewGuid():N}{safeExtension}");
+    var partPaths = new List<string>();
     try
     {
-        await using (var output = File.Create(tempPath)) await file.CopyToAsync(output);
+        if (audioFiles.Count == 1)
+        {
+            await using var output = File.Create(tempPath);
+            await audioFiles[0].CopyToAsync(output);
+        }
+        else
+        {
+            foreach (var audioFile in audioFiles)
+            {
+                var partExtension = audioFile.ContentType.Contains("ogg", StringComparison.OrdinalIgnoreCase) ? ".ogg"
+                    : audioFile.ContentType.Contains("mp4", StringComparison.OrdinalIgnoreCase) ? ".m4a"
+                    : audioFile.ContentType.Contains("wav", StringComparison.OrdinalIgnoreCase) ? ".wav" : ".webm";
+                var partPath = Path.Combine(Path.GetTempPath(), $"eldf-part-{Guid.NewGuid():N}{partExtension}");
+                partPaths.Add(partPath);
+                await using var output = File.Create(partPath);
+                await audioFile.CopyToAsync(output);
+            }
+            var arguments = new List<string> { "-y" };
+            foreach (var partPath in partPaths) arguments.AddRange(["-i", partPath]);
+            var streams = string.Concat(Enumerable.Range(0, partPaths.Count).Select(index => $"[{index}:a:0]"));
+            arguments.AddRange(["-filter_complex", $"{streams}concat=n={partPaths.Count}:v=0:a=1[outa]", "-map", "[outa]", "-vn", "-c:a", "libopus", "-b:a", "64k", "-ac", "1", "-ar", "48000", tempPath]);
+            await RunProcess(ffmpegPath, arguments.ToArray());
+        }
         var seconds = await GetAudioDuration(tempPath, ffprobePath);
         if (seconds < minSeconds) return Problem(422, "The actual audio file is shorter than 30 minutes and cannot be submitted.");
         if (seconds > maxSeconds) return Problem(422, "The recording exceeds the server's maximum duration.");
-        var userFolder = Path.Combine(audioDirectory, user.Id.ToString());
+        var userFolder = Path.Combine(audioDirectory, draftOwnerId.ToString());
         Directory.CreateDirectory(userFolder);
         var fileName = Guid.NewGuid().ToString("N") + (new[] { ".webm", ".wav", ".ogg", ".m4a", ".mp3" }.Contains(safeExtension) ? safeExtension : ".audio");
         var targetPath = Path.Combine(userFolder, fileName);
         File.Move(tempPath, targetPath);
-        var submission = new WorkSubmission { UserAccountId = user.Id, AssignedAgentId = user.ReferredByAgentId, ProjectLanguage = Limit(form["language"], 160), DurationSeconds = seconds, AudioPath = Path.GetRelativePath(dataDirectory, targetPath), Transcript = transcript, Translation = translation, Status = user.ReferredByAgentId.HasValue ? "Awaiting agent review" : "Awaiting admin review", UpdatedAtUtc = DateTime.UtcNow };
+        var draftOwner = draftOwnerId == user.Id ? user : await db.Users.SingleAsync(x => x.Id == draftOwnerId);
+        var submission = new WorkSubmission { UserAccountId = draftOwner.Id, AssignedAgentId = draftOwner.ReferredByAgentId, ProjectLanguage = Limit(form["language"], 160), DurationSeconds = seconds, AudioPath = Path.GetRelativePath(dataDirectory, targetPath), Transcript = transcript, Translation = translation, Status = draftOwner.ReferredByAgentId.HasValue ? "Awaiting agent review" : "Awaiting admin review", UpdatedAtUtc = DateTime.UtcNow };
         db.Submissions.Add(submission);
         await db.SaveChangesAsync();
         await WorkflowEvents.RecordAsync(db, user, "Work submitted", "Submission", submission.Id.ToString(), submission.ProjectLanguage);
@@ -194,11 +388,23 @@ app.MapPost("/api/submissions", async (HttpRequest request, EldfDbContext db) =>
         db.AudioProcessing.Add(new AudioProcessingRecord { SubmissionId = submission.Id, Status = "queued" });
         await db.SaveChangesAsync();
         await queue.EnqueueAsync(submission.Id);
+        if (sourceDraft is not null)
+        {
+            db.Drafts.Remove(sourceDraft);
+            await db.SaveChangesAsync();
+            var draftPath = Path.GetFullPath(Path.Combine(dataDirectory, sourceDraft.AudioPath));
+            var draftsRoot = Path.GetFullPath(Path.Combine(dataDirectory, "drafts")) + Path.DirectorySeparatorChar;
+            if (draftPath.StartsWith(draftsRoot, StringComparison.OrdinalIgnoreCase) && File.Exists(draftPath)) File.Delete(draftPath);
+        }
 
         return Results.Json(new { ok = true, submissionId = submission.Id, status = submission.Status, minimumSeconds = minSeconds, audioQuality = "queued" });
     }
     catch (InvalidOperationException ex) { return Problem(422, ex.Message); }
-    finally { if (File.Exists(tempPath)) File.Delete(tempPath); }
+    finally
+    {
+        if (File.Exists(tempPath)) File.Delete(tempPath);
+        foreach (var partPath in partPaths) if (File.Exists(partPath)) File.Delete(partPath);
+    }
 });
 
 app.MapDelete("/api/submissions/{id:int}", async (int id, HttpRequest request, EldfDbContext db) =>
@@ -214,8 +420,11 @@ app.MapDelete("/api/submissions/{id:int}", async (int id, HttpRequest request, E
     return Results.Json(new { ok = true });
 });
 
-app.MapPost("/api/audio/process", async (HttpRequest request) =>
+app.MapPost("/api/audio/process", async (HttpRequest request, EldfDbContext db) =>
 {
+    var user = await SessionAuth.CurrentUser(request, db);
+    if (user is null) return Problem(401, "Please sign in to continue.");
+    if (user.Role != "contributor") return Problem(403, "Contributor access is required.");
     var form = await request.ReadFormAsync();
     var file = form.Files.GetFile("file");
     if (file is null || file.Length == 0 || file.Length > maxBytes) return Problem(413, "The audio file is empty or too large.");
@@ -294,7 +503,7 @@ static async Task IssueSession(EldfDbContext db, UserAccount user, HttpRequest r
     var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
     db.Sessions.Add(new LoginSession { UserAccountId = user.Id, TokenHash = tokenHash, ExpiresAtUtc = DateTime.UtcNow.AddDays(14) });
     await db.SaveChangesAsync();
-    var isHttps = request.IsHttps || string.Equals(Environment.GetEnvironmentVariable("ELDF_COOKIE_SECURE"), "true", StringComparison.OrdinalIgnoreCase) || app.Configuration.GetValue("Cookies:Secure", false);
+    var isHttps = request.IsHttps || app.Environment.IsProduction() || string.Equals(Environment.GetEnvironmentVariable("ELDF_COOKIE_SECURE"), "true", StringComparison.OrdinalIgnoreCase) || app.Configuration.GetValue("Cookies:Secure", false);
     request.HttpContext.Response.Cookies.Append("eldf_session", token, new CookieOptions { HttpOnly = true, Secure = isHttps, SameSite = SameSiteMode.Lax, MaxAge = TimeSpan.FromDays(14), Path = "/" });
 }
 static string NormalizeReferralCode(string value)

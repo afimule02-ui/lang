@@ -14,6 +14,10 @@
   <button class="filter-chip" [class.selected]="tab==='users'" (click)="tab='users'">{{ tr.t('Users') }}</button>
   <button class="filter-chip" [class.selected]="tab==='finance'" (click)="tab='finance'">Finance</button>
   <button class="filter-chip" [class.selected]="tab==='events'" (click)="tab='events'">Events</button>
+  <button class="filter-chip" [class.selected]="tab==='consents'" (click)="showConsents()">Speaker consent</button>
+  <button class="filter-chip" [class.selected]="tab==='drafts'" (click)="tab='drafts'">Interrupted work</button>
+  <button class="filter-chip" [class.selected]="tab==='completed'" (click)="tab='completed'">Completed work</button>
+  <button class="filter-chip" [class.selected]="tab==='settings'" (click)="tab='settings'">Admin settings</button>
 </div>
 
 @if (tab === 'overview') {
@@ -23,6 +27,7 @@
     <div class="metric-card"><span>{{ tr.t('Approved items') }}</span><strong>{{ workspace.data()?.report?.approved ?? 0 }}</strong></div>
     <div class="metric-card"><span>{{ tr.t('Returned items') }}</span><strong>{{ workspace.data()?.report?.returned ?? 0 }}</strong></div>
     <div class="metric-card"><span>{{ tr.t('Collected audio hours') }}</span><strong>{{ workspace.data()?.report?.audioHours ?? 0 }}</strong></div>
+    <div class="metric-card"><span>Started / interrupted work</span><strong>{{ workspace.data()?.drafts?.length ?? 0 }}</strong></div>
   </div>
   <section class="workspace-card">
     <h2>Quick links</h2>
@@ -30,6 +35,47 @@
       <a routerLink="/review" class="secondary-button">{{ tr.t('Review queues') }}</a>
       <a routerLink="/catalog" class="secondary-button">{{ tr.t('Language catalog') }}</a>
     </div>
+  </section>
+}
+
+@if (tab === 'drafts') {
+  <section class="workspace-card">
+    <h2>Started and interrupted work</h2>
+    @if (actionError) { <p class="status-pill" role="status">{{ tr.t(actionError) }}</p> }
+    @for (draft of workspace.data()?.drafts ?? []; track draft.id) {
+      <article class="panel">
+        <div class="page-heading">
+          <div><strong>{{ draft.ownerName }}</strong> · {{ draft.ownerPhone }}<p>{{ draft.language }} · {{ draft.durationSeconds / 60 | number:'1.0-0' }} min · {{ draft.updatedAt | date:'short' }}</p></div>
+          <span class="status-pill">{{ draft.hasTranslation ? 'Translation' : draft.hasTranscript ? 'Transcription' : draft.hasAudio ? 'Recording saved' : 'Started' }}</span>
+        </div>
+        <p>Audio: {{ draft.hasAudio ? 'saved' : 'not on server yet' }} · Transcript: {{ draft.hasTranscript ? 'saved' : 'not started' }} · Translation: {{ draft.hasTranslation ? 'saved' : 'not started' }}</p>
+        @if (draft.hasAudio && draft.audioUrl) { <audio controls preload="none" [src]="draft.audioUrl"></audio> }
+        <label class="field">Assign this work to an active contributor
+          <select [(ngModel)]="draftAssignments[draft.id]">
+            <option [ngValue]="draft.ownerUserId">Keep with original contributor — {{ draft.ownerName }}</option>
+            @for (contributor of assignableContributors; track contributor.id) {
+              <option [ngValue]="contributor.id">{{ contributor.name }} · {{ contributor.phone }}</option>
+            }
+          </select>
+        </label>
+        <button class="secondary-button" (click)="reassignDraft(draft, draftAssignments[draft.id] ?? null)">Save assignment</button>
+      </article>
+    } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No saved interrupted work is available.</p> } }
+  </section>
+}
+
+@if (tab === 'settings') {
+  <section class="workspace-card">
+    <h2>Administrator sign-in settings</h2>
+    <p>The sign-in username is the administrator phone number. Confirm your current password to change the name or username.</p>
+    @if (profileError) { <p class="form-error" role="alert">{{ tr.t(profileError) }}</p> }
+    @if (profileMessage) { <p class="status-pill approved" role="status">{{ tr.t(profileMessage) }}</p> }
+    <form class="settings-form" (ngSubmit)="saveProfile()">
+      <label class="field">Administrator name<input name="adminName" [(ngModel)]="profileName" minlength="2" maxlength="160" required /></label>
+      <label class="field">Sign-in username (international phone)<input name="adminPhone" [(ngModel)]="profilePhone" autocomplete="tel" required /></label>
+      <label class="field">Current password<input name="profileCurrentPassword" type="password" [(ngModel)]="profileCurrentPassword" autocomplete="current-password" required /></label>
+      <div class="entry-actions"><button class="primary-button" [disabled]="profileBusy">{{ profileBusy ? 'Saving…' : 'Save sign-in settings' }}</button><a routerLink="/change-password" class="secondary-button">Change password</a></div>
+    </form>
   </section>
 }
 
@@ -54,11 +100,30 @@
             </select>
           </label>
         }
+        @if (account.role === 'agent') { <p>{{ tr.t("Agent access uses this participant's existing phone number and password. They will see a notice and their referral link after their next sign-in.") }}</p> }
         @if (account.role === 'agent' && account.referralCode) { <p>Referral code: <strong>{{ account.referralCode }}</strong></p> }
         <label class="check-row"><input type="checkbox" [(ngModel)]="account.active" [disabled]="savingUserId === account.id" /> Active</label>
         <button class="secondary-button" [disabled]="savingUserId === account.id" (click)="saveUser(account)">Save account</button>
       </div>
     } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No accounts found.</p> } }
+  </section>
+}
+
+@if (tab === 'completed') {
+  <section class="workspace-card">
+    <h2>{{ tr.t('Completed and approved work') }}</h2>
+    @if (actionError) { <p class="status-pill" role="status">{{ tr.t(actionError) }}</p> }
+    <button class="primary-button" [disabled]="selectedDatasetCount < 1 || selectedDatasetCount > 100" (click)="downloadDataset()">Download selected as dataset ZIP ({{ selectedDatasetCount }})</button>
+    @for (item of completedSubmissions; track item.id) {
+      <div class="panel">
+        <div class="page-heading"><div><label class="check-row"><input type="checkbox" [(ngModel)]="selectedDatasetItems[item.id]" /> Include in dataset export</label><strong>{{ item.submissionCode }}</strong> · {{ item.language }}<p>{{ item.contributorName }} · {{ item.durationSeconds / 60 | number:'1.0-0' }} min · {{ item.updatedAt }}</p></div><span class="status-pill approved">{{ item.status }}</span></div>
+        <p>{{ tr.t('The ZIP contains audio, transcript, translation and JSON metadata. It is generated on first download and stored with the submission.') }}</p>
+        <div class="entry-actions">
+          <a class="primary-button" [href]="'/api/submissions/' + item.id + '/delivery'">{{ tr.t('Download') }} {{ item.submissionCode }}.zip</a>
+          <button class="secondary-button" (click)="shareDeliveryLink(item.id)">{{ tr.t('Copy protected share link') }}</button>
+        </div>
+      </div>
+    } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No approved submissions yet.</p> } }
   </section>
 }
 
@@ -100,5 +165,20 @@
         }
       </div>
     } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No activity recorded yet.</p> } }
+  </section>
+}
+
+@if (tab === 'consents') {
+  <section class="workspace-card">
+    <h2>Speaker consent history</h2>
+    <p>Restricted to administrators. Records are append-only; withdrawal timestamps remain in the audit history.</p>
+    @if (consentError) { <p class="form-error">{{ consentError }}</p> }
+    @for (record of consentRecords; track record.id) {
+      <div class="panel">
+        <strong>{{ record.speakerId }}</strong> · {{ record.userName }} · {{ record.language }} · {{ record.consentVersion }}
+        <div>Core: {{ record.coreConsent ? 'Yes' : 'No' }} · AI development: {{ record.aiDevelopmentConsent ? 'Yes' : 'No' }} · Research sharing: {{ record.researchSharingConsent ? 'Yes' : 'No' }} · Public release: {{ record.publicReleaseConsent ? 'Yes' : 'No' }}</div>
+        <small>Accepted: {{ record.consentedAtUtc | date:'medium' }} · Withdrawn: {{ record.withdrawnAtUtc ? (record.withdrawnAtUtc | date:'medium') : 'No' }}</small>
+      </div>
+    } @empty { @if (!consentError) { <p>No speaker consent records found.</p> } }
   </section>
 }

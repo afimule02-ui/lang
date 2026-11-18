@@ -1,4 +1,14 @@
-{$SITE_DOMAIN} {
+{
+	default_sni 142.132.228.77
+}
+
+142.132.228.77 {
+	tls {
+		issuer acme https://acme-v02.api.letsencrypt.org/directory {
+			profile shortlived
+		}
+	}
+
 	encode zstd gzip
 	request_body {
 		max_size 260MB

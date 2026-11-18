@@ -12,3 +12,7 @@ __pycache__/
 *.py[cod]
 eldf-server-data/
 server-data/
+Eldf.Api/App_Data/
+Eldf.Api/App_Data_PipelineTest/
+**/recordings/
+**/processed/

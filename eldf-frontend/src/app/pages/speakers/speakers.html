@@ -23,17 +23,21 @@
         <legend>{{ tr.t('Speaker') }} {{ i + 1 }}</legend>
         <label>{{ tr.t('Speaker ID') }}<input [value]="s.speakerId" readonly /></label>
         <label>{{ tr.t('Full name') }} *<input [(ngModel)]="s.name" [name]="'name'+i" placeholder="{{ tr.t('Full name') }}" required /></label>
-        <label>{{ tr.t('Age range') }} *<input [(ngModel)]="s.ageRange" [name]="'age'+i" placeholder="e.g. 18–25" required /></label>
+        <label>{{ tr.t('Age range') }} *
+          <select [(ngModel)]="s.ageRange" [name]="'age'+i" required>
+            <option value="">{{ tr.t('Select') }}</option><option>18–25</option><option>26–35</option><option>36–45</option><option>46–60</option><option>61+</option>
+          </select>
+        </label>
         <label>{{ tr.t('Gender') }}
           <select [(ngModel)]="s.gender" [name]="'gender'+i">
             <option value="">—</option><option>Woman</option><option>Man</option><option>Prefer not to say</option>
           </select>
         </label>
-        <label>{{ tr.t('Education') }} *
-          <select [(ngModel)]="s.educationLevel" [name]="'edu'+i" required>
+        <label>{{ tr.t('Education') }} · {{ tr.t('Optional') }}
+          <select [(ngModel)]="s.educationLevel" [name]="'edu'+i">
             <option value="">{{ tr.t('Select') }}</option>
-            <option>No formal schooling</option><option>Primary school</option><option>Secondary school</option>
-            <option>Bachelor's degree</option><option>Postgraduate degree</option><option>Prefer not to say</option>
+            <option>No formal education</option><option>Primary</option><option>Secondary</option><option>Diploma</option>
+            <option>Bachelor's degree</option><option>Master's degree</option><option>Doctorate</option><option>Other</option>
           </select>
         </label>
         <label>{{ tr.t('Language') }} *<input [(ngModel)]="s.preferredLanguage" [name]="'lang'+i" required /></label>
@@ -42,12 +46,39 @@
       </fieldset>
     }
   </div>
-  <label class="check-row">
-    <input type="checkbox" [(ngModel)]="consent" name="consent" />
-    <span>{{ tr.t('Consent from every participant is required before recording.') }}</span>
-  </label>
+  <section class="consent-box speaker-consent" aria-labelledby="speakerConsentTitle">
+    <h2 id="speakerConsentTitle">{{ consentCopy[tr.lang()].title }}</h2>
+    <p>{{ consentCopy[tr.lang()].intro }}</p>
+    <p>{{ consentCopy[tr.lang()].collected }}</p>
+    <p>{{ consentCopy[tr.lang()].use }}</p>
+    <p><strong>{{ consentCopy[tr.lang()].retention }}</strong></p>
+    <p>{{ consentCopy[tr.lang()].withdrawal }}</p>
+    <p>{{ consentCopy[tr.lang()].rights }}</p>
+    <p class="form-error">{{ consentCopy[tr.lang()].review }}</p>
+    <p>{{ consentCopy[tr.lang()].support }}</p>
+    <p>{{ consentCopy[tr.lang()].optional }}</p>
+    @for (s of speakers; track s.speakerId; let i = $index) {
+      <fieldset class="speaker-consent-choice">
+        <legend>{{ tr.t('Speaker') }} {{ i + 1 }} · {{ s.name || s.speakerId }}</legend>
+        <label class="check-row"><input type="checkbox" [(ngModel)]="s.coreConsent" [name]="'coreConsent'+i" />
+          <span>{{ consentCopy[tr.lang()].core }}</span></label>
+        <p>{{ consentCopy[tr.lang()].ai }}</p>
+        <label class="check-row"><input type="checkbox" [(ngModel)]="s.aiDevelopmentConsent" [name]="'aiConsent'+i" />
+          <span>{{ tr.t('I agree to optional AI development use.') }}</span></label>
+        <p>{{ consentCopy[tr.lang()].research }}</p>
+        <label class="check-row"><input type="checkbox" [(ngModel)]="s.researchSharingConsent" [name]="'researchConsent'+i" />
+          <span>{{ tr.t('I agree to optional research sharing.') }}</span></label>
+        <p>{{ consentCopy[tr.lang()].public }}</p>
+        <details><summary>{{ tr.t('Proposed public release terms (inactive pending legal approval)') }}</summary><p>{{ consentCopy[tr.lang()].publicLicense }}</p></details>
+        @if (s.coreConsent) { <button type="button" class="secondary-button" (click)="withdraw(s)">{{ tr.t('Withdraw consent') }}</button> }
+      </fieldset>
+    }
+  </section>
   @if (error) { <div class="form-error">{{ tr.t(error) }}</div> }
   <div class="form-footer">
-    <button class="primary-button" (click)="submit()" [disabled]="loading">{{ tr.t('Continue') }}</button>
+    <button class="primary-button speaker-continue" (click)="submit()" [disabled]="loading" [attr.aria-busy]="loading">
+      @if (loading) { <span class="button-spinner" aria-hidden="true"></span><span>{{ tr.t('Saving speaker profiles…') }}</span> }
+      @else { {{ tr.t('Continue') }} }
+    </button>
   </div>
 </section>

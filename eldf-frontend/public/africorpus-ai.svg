@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 132" role="img" aria-labelledby="title desc">
-  <title id="title">AfriCorpus AI</title>
+  <title id="title">AfriLisan AI</title>
   <desc id="desc">African language and speech datasets</desc>
   <defs>
     <linearGradient id="bronze" x1="0%" y1="0%" x2="100%" y2="100%"><stop stop-color="#f0bb84"/><stop offset="38%" stop-color="#d9924f"/><stop offset="72%" stop-color="#b9712f"/><stop offset="100%" stop-color="#8d4f1a"/></linearGradient>
@@ -22,7 +22,7 @@
     <path d="M100 76h124q14 0 14 14v46q0 14-14 14h-92l-28 28v-28h-4q-14 0-14-14V90q0-14 14-14Z" fill="none" stroke="#2b4e69" stroke-width="9.5" stroke-linejoin="round" stroke-linecap="round"/>
     <g fill="#22384b"><rect x="95" y="105" width="6" height="16" rx="3"/><rect x="111" y="99" width="6" height="28" rx="3"/><rect x="127" y="92" width="6" height="42" rx="3"/><rect x="143" y="87" width="6" height="52" rx="3"/><rect x="159" y="91" width="6" height="44" rx="3"/><rect x="175" y="85" width="6" height="56" rx="3"/><rect x="191" y="95" width="6" height="36" rx="3"/><rect x="207" y="101" width="6" height="24" rx="3"/><rect x="223" y="106" width="6" height="14" rx="3"/></g>
   </g>
-  <text x="124" y="62" font-family="Manrope, Arial, sans-serif" font-weight="900" font-size="47" letter-spacing=".5"><tspan fill="url(#bronzeText)">AFRI</tspan><tspan fill="url(#slateText)">CORPUS</tspan></text>
+  <text x="124" y="62" font-family="Manrope, Arial, sans-serif" font-weight="900" font-size="47" letter-spacing=".5"><tspan fill="url(#bronzeText)">AFRI</tspan><tspan fill="url(#slateText)">LISAN</tspan></text>
   <text x="124" y="104" font-family="Manrope, Arial, sans-serif" font-weight="900" font-size="36" fill="url(#slateText)" letter-spacing="1">AI</text>
   <rect x="178" y="78" width="248" height="4" rx="2" fill="url(#slateText)" opacity=".75"/><rect x="178" y="86" width="190" height="3" rx="1.5" fill="#ef8e2c"/>
   <text x="178" y="106" font-family="Arial, sans-serif" font-weight="700" font-size="13" fill="#8fa6b4" letter-spacing=".8">POWERING AFRICAN LANGUAGE</text>

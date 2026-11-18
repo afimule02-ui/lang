@@ -17,6 +17,7 @@ export class ShellComponent {
   constructor(public auth: AuthService, public tr: TranslateService, private router: Router) {}
 
   get user() { return this.auth.user(); }
+  get isAuthPage() { return /^\/(login|register)(\/|$)/.test(this.router.url); }
   get lang() { return this.auth.lang(); }
 
   setLang(l: 'am' | 'en') {

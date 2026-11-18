@@ -6,6 +6,7 @@ import { AuthService } from '../../services/auth.service';
 import { TranslateService } from '../../services/translate.service';
 import { WorkspaceService } from '../../services/workspace.service';
 import { ApiService } from '../../services/api.service';
+import { CaptureSessionService } from '../../services/capture-session.service';
 
 @Component({
   selector: 'app-dashboard',
@@ -18,12 +19,25 @@ export class DashboardComponent implements OnInit {
   payoutError = '';
   payoutMessage = '';
   submittingPayout = false;
-  constructor(public auth: AuthService, public tr: TranslateService, public workspace: WorkspaceService, private api: ApiService) {}
+  constructor(public auth: AuthService, public tr: TranslateService, public workspace: WorkspaceService, public capture: CaptureSessionService, private api: ApiService) {}
   get user() { return this.auth.user(); }
+  get serverDrafts() {
+    const localIds = new Set(this.capture.savedDrafts().map(draft => draft.serverDraftId).filter((id): id is number => !!id));
+    return (this.workspace.data()?.drafts ?? []).filter(draft => !localIds.has(draft.id));
+  }
 
   async ngOnInit() {
     await this.auth.ready;
-    if (this.auth.user()) await this.workspace.load().catch(() => {});
+    const user = this.auth.user();
+    if (user) {
+      await Promise.all([
+        this.workspace.load().catch(() => {}),
+        this.capture.loadDrafts(user.id).catch(() => {
+          this.capture.storageWarning.set('Saved work in this browser could not be listed. Check browser storage permissions and do not clear site data.');
+          return [];
+        })
+      ]);
+    }
   }
 
   count(status: string) {

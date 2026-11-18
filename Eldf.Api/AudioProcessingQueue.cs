@@ -128,8 +128,13 @@ public sealed class AudioProcessingWorker(
             record.ProcessedSha256 = p.Sha256;
             record.ProcessedSizeBytes = p.SizeBytes;
             record.ProcessedDurationSeconds = p.DurationSeconds;
-            var zip = Path.Combine(delivery, $"ELDF_SUBMISSION_{submissionId}.zip");
-            if (File.Exists(zip)) record.DeliveryZipPath = paths.ToRelative(zip);
+            try
+            {
+                var packagePath = await SubmissionDeliveryPackage.EnsureAsync(submission, record, paths, ct);
+                record.DeliveryZipPath = paths.ToRelative(packagePath);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException)
+            { log.LogWarning(ex, "Could not assemble the text package for submission {Id}", submissionId); }
         }
 
         record.Status = string.IsNullOrEmpty(report.Error) ? "done" : "failed";
@@ -145,6 +150,7 @@ public sealed class AudioProcessingWorker(
 
     private static string Trim(string value, int max) =>
         string.IsNullOrEmpty(value) ? "" : value[..Math.Min(max, value.Length)];
+
 }
 
 /// <summary>

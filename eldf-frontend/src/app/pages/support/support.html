@@ -1,0 +1,77 @@
+<div class="page-heading">
+  <div>
+    <div class="eyebrow">{{ tr.t('HELP AND SUPPORT') }}</div>
+    <h1>{{ tr.t('Support center') }}</h1>
+    <p>{{ tr.t('Send a message to the AfriLisan AI team and follow the response here.') }}</p>
+  </div>
+</div>
+
+@if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
+@if (error) { <p class="form-error" role="alert">{{ error }}</p> }
+@if (notice) { <p class="status-pill approved" role="status">{{ notice }}</p> }
+
+@if (role === 'contributor') {
+  <section class="workspace-card">
+    <h2>{{ tr.t('Open a support request') }}</h2>
+    <form (ngSubmit)="createTicket()" class="support-create-form">
+      <label class="field">{{ tr.t('Subject') }}<input name="subject" [(ngModel)]="subject" maxlength="200" minlength="3" required /></label>
+      <label class="field">{{ tr.t('Message') }}<textarea name="message" [(ngModel)]="firstMessage" maxlength="4000" rows="4" required></textarea></label>
+      <button class="primary-button" [disabled]="busy === 'create' || subject.trim().length < 3 || firstMessage.trim().length < 2">{{ busy === 'create' ? tr.t('Sending…') : tr.t('Create request') }}</button>
+    </form>
+  </section>
+}
+
+<section class="workspace-card">
+  <h2>{{ role === 'contributor' ? tr.t('My support requests') : tr.t('Support requests') }}</h2>
+  @for (ticket of tickets; track ticket.id) {
+    <article class="panel support-ticket">
+      <div class="support-ticket-heading">
+        <div>
+          <h3>{{ ticket.subject }}</h3>
+          @if (role !== 'contributor') { <p>{{ ticket.createdByName }} · {{ ticket.createdByPhone }}</p> }
+          <small>{{ tr.t('Updated') }} {{ ticket.updatedAt | date:'medium' }}</small>
+        </div>
+        <span class="status-pill" [class.approved]="ticket.status === 'Closed'" [class.pending]="ticket.status !== 'Closed'">{{ ticket.status }}</span>
+      </div>
+
+      @if (role === 'admin') {
+        <div class="support-admin-controls">
+          <label class="field">{{ tr.t('Status') }}
+            <select [name]="'status-' + ticket.id" [(ngModel)]="statusChoices[ticket.id]">
+              <option [ngValue]="undefined">{{ ticket.status }}</option>
+              <option value="Open">Open</option><option value="In progress">In progress</option><option value="Escalated">Escalated</option><option value="Closed">Closed</option>
+            </select>
+          </label>
+          <label class="field">{{ tr.t('Assign agent') }}
+            <select [name]="'agent-' + ticket.id" [(ngModel)]="agentChoices[ticket.id]">
+              <option [ngValue]="null">{{ ticket.assignedAgentId ? tr.t('Keep current assignment') : tr.t('Unassigned') }}</option>
+              @for (agent of agents; track agent.id) { <option [ngValue]="agent.id">{{ agent.name }}</option> }
+            </select>
+          </label>
+          <button class="secondary-button" [disabled]="busy === 'update-' + ticket.id" (click)="saveAdminUpdate(ticket.id, ticket.status, ticket.assignedAgentId)">{{ tr.t('Save case') }}</button>
+        </div>
+      }
+
+      <div class="support-messages">
+        @for (message of ticket.messages; track message.id) {
+          <div class="support-message">
+            <div><strong>{{ message.name }}</strong> <span>{{ tr.t(message.role === 'admin' ? 'Administrator' : message.role === 'agent' ? 'Agent / focal person' : 'Contributor') }}</span><time>{{ message.createdAt | date:'short' }}</time></div>
+            <p>{{ message.body }}</p>
+          </div>
+        }
+      </div>
+
+      @if (ticket.status !== 'Closed') {
+        <form class="support-reply" (ngSubmit)="sendReply(ticket.id)">
+          <label class="field">{{ tr.t('Reply') }}<textarea [name]="'reply-' + ticket.id" [(ngModel)]="replies[ticket.id]" maxlength="4000" rows="2" required></textarea></label>
+          <button class="primary-button" [disabled]="busy === 'reply-' + ticket.id || !(replies[ticket.id] ?? '').trim()">{{ busy === 'reply-' + ticket.id ? tr.t('Sending…') : tr.t('Send reply') }}</button>
+        </form>
+      }
+      @if (role === 'agent' && ticket.assignedAgentId === auth.user()?.id && ticket.status !== 'Closed') {
+        <button class="secondary-button" [disabled]="busy === 'update-' + ticket.id" (click)="escalate(ticket.id)">{{ tr.t('Escalate to administrator') }}</button>
+      }
+    </article>
+  } @empty {
+    @if (!workspace.loading() && !workspace.error()) { <p>{{ tr.t('No support requests yet.') }}</p> }
+  }
+</section>

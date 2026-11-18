@@ -18,6 +18,31 @@
 @if (workspace.error()) { <p class="form-error">{{ workspace.error() }}</p> }
 
 <section class="workspace-card">
+  <h2>{{ tr.t('Started work') }}</h2>
+  @if (capture.storageWarning()) { <p class="form-error" role="alert">{{ tr.t(capture.storageWarning()) }}</p> }
+  @for (draft of capture.savedDrafts(); track draft.ownerId) {
+    <div class="panel">
+      <div class="page-heading">
+        <div><h3>{{ draft.language || tr.t('Recording') }}</h3><p>{{ tr.t('Saved on this device') }} · {{ draft.elapsedSeconds / 60 | number:'1.0-0' }} min · {{ draft.updatedAt | date:'short' }}</p></div>
+        <span class="status-pill">{{ draft.stage }}</span>
+      </div>
+      <a routerLink="/record" class="primary-button">{{ tr.t('Continue started work') }} →</a>
+    </div>
+  } @empty {
+    <p>{{ tr.t('Started work will appear here automatically and can be resumed on this device.') }}</p>
+  }
+  @for (draft of serverDrafts; track draft.id) {
+    <div class="panel">
+      <div class="page-heading">
+        <div><h3>{{ draft.language || tr.t('Recording') }}</h3><p>{{ draft.ownerUserId === user?.id ? 'Your saved work' : 'Assigned to you' }} · {{ draft.durationSeconds / 60 | number:'1.0-0' }} min · {{ draft.updatedAt | date:'short' }}</p></div>
+        <span class="status-pill">{{ draft.hasTranslation ? 'Translation' : draft.hasTranscript ? 'Transcription' : draft.hasAudio ? 'Recording saved' : 'Started' }}</span>
+      </div>
+      <a [routerLink]="['/record']" [queryParams]="{ draftId: draft.id }" class="primary-button">{{ tr.t('Continue started work') }} →</a>
+    </div>
+  }
+</section>
+
+<section class="workspace-card">
   <h2>{{ tr.t('My submissions') }}</h2>
   @if (workspace.data()?.submissions?.length) {
     <div class="panel" *ngFor="let submission of workspace.data()?.submissions">

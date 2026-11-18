@@ -1,7 +1,7 @@
-<div class="app-frame">
+<div class="app-frame" [class.auth-page]="isAuthPage">
   <aside class="sidebar" [class.open]="sidebarOpen">
     <a class="brand" routerLink="/">
-      <span class="brand-afri-logo"><img src="/africorpus-ai.svg" alt="AfriCorpus AI" /></span>
+      <span class="brand-afri-logo"><img src="/africorpus-ai.svg" alt="AfriLisan AI" /></span>
     </a>
 
     <div class="workspace-label">{{ tr.t('WORKSPACE') }} <i></i></div>
@@ -12,6 +12,7 @@
 
       @if (user) {
         <a routerLink="/change-password" routerLinkActive="active" class="nav-link">▧ {{ tr.t('Change password') }}</a>
+        <a routerLink="/support" routerLinkActive="active" class="nav-link">✉ {{ tr.t('Support center') }}</a>
         @if (user.role === 'admin') {
           <div class="nav-group-label">{{ tr.t('Administration') }}</div>
           <a routerLink="/admin" routerLinkActive="active" class="nav-link">▤ {{ tr.t('Administration') }}</a>
@@ -64,7 +65,7 @@
     </main>
 
     <footer class="page-footer">
-      <span>{{ tr.t('AFRICA · COMMUNITY · LANGUAGES') }} <b>· AFRICORPUS AI</b></span>
+      <span>{{ tr.t('AFRICA · COMMUNITY · LANGUAGES') }} <b>· AFRILISAN AI</b></span>
     </footer>
   </div>
 </div>

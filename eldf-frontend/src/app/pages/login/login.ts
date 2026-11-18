@@ -3,7 +3,7 @@ import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../services/auth.service';
 import { TranslateService } from '../../services/translate.service';
-import { AFRICAN_PHONE_COUNTRIES, internationalPhoneNumber } from '../../services/africa-phone';
+import { AFRICAN_PHONE_COUNTRIES, internationalPhoneNumber, isValidPhoneNumber } from '../../services/africa-phone';
 
 @Component({
   selector: 'app-login',
@@ -18,7 +18,9 @@ export class LoginComponent implements OnInit {
   dialCode = '251';
   phoneCountries = AFRICAN_PHONE_COUNTRIES;
   password = '';
+  showPassword = false;
   error = '';
+  phoneFormatInvalid = false;
   loading = false;
 
   constructor(
@@ -38,22 +40,29 @@ export class LoginComponent implements OnInit {
 
   async submit() {
     this.error = '';
+    this.phoneFormatInvalid = false;
+    if (!isValidPhoneNumber(this.phone, this.dialCode)) {
+      this.phoneFormatInvalid = true;
+      this.error = this.tr.t('Enter a valid phone number with its country code.');
+      return;
+    }
+
     this.loading = true;
     try {
       const form = new FormData();
       form.append('phone', internationalPhoneNumber(this.phone, this.dialCode));
       form.append('password', this.password);
       const user = await this.auth.login(form);
-      if (user.role !== this.role) {
-        await this.auth.logout(false);
-        this.error = 'This account does not have access to this sign-in page.';
-        return;
-      }
       this.router.navigate([user.role === 'admin' ? '/admin' : user.role === 'agent' ? '/agent' : '/project']);
     } catch (e: any) {
       this.error = e?.error?.detail ?? e?.message ?? 'Login failed.';
     } finally {
       this.loading = false;
     }
+  }
+
+  onPhoneInputChanged() {
+    this.phoneFormatInvalid = false;
+    this.error = '';
   }
 }

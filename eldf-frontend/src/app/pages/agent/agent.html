@@ -8,6 +8,7 @@
 
 @if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
 @if (workspace.error()) { <p class="form-error">{{ workspace.error() }}</p> }
+@if (welcomeMessage) { <p class="status-pill approved" role="status">{{ tr.t(welcomeMessage) }}</p> }
 
 <section class="workspace-card">
   <h2>{{ tr.t('Your contributor team') }}</h2>
@@ -30,6 +31,15 @@
       @if (payment.reviewNote) { <p>{{ payment.reviewNote }}</p> }
     </div>
   } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No payout requests are waiting for your team.</p> } }
+</section>
+
+<section class="workspace-card">
+  <h2>Team work in progress</h2>
+  @for (draft of workspace.data()?.teamDrafts ?? []; track draft.id) {
+    <div class="panel"><strong>{{ draft.contributorName }}</strong> · {{ draft.language }} · {{ draft.durationSeconds / 60 | number:'1.0-0' }} min · {{ draft.updatedAt }}
+      <p>Audio: {{ draft.hasAudio ? 'saved' : 'not saved' }} · Transcript: {{ draft.hasTranscript ? 'saved' : 'not started' }} · Translation: {{ draft.hasTranslation ? 'saved' : 'not started' }}</p>
+    </div>
+  } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No in-progress team work.</p> } }
 </section>
 
 <section class="workspace-card">

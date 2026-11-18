@@ -12,22 +12,31 @@
   <div class="field">
     <label>{{ tr.t('Phone number') }}</label>
     <div class="phone-field">
-      <select [(ngModel)]="dialCode" name="dialCode" [attr.aria-label]="tr.t('Country calling code')">
-        @for (country of phoneCountries; track country.code) { <option [value]="country.dialCode">+{{ country.dialCode }} · {{ country.name }}</option> }
+      <select [(ngModel)]="dialCode" name="dialCode" [attr.aria-label]="tr.t('Country calling code')" (ngModelChange)="onPhoneInputChanged()">
+        @for (country of phoneCountries; track country.code) { <option [value]="country.dialCode">{{ country.name }} (+{{ country.dialCode }})</option> }
       </select>
-      <input [(ngModel)]="phone" name="phone" placeholder="Phone number" inputmode="tel" required />
+      <input [(ngModel)]="phone" name="phone" type="tel" autocomplete="tel-national" placeholder="Phone number" inputmode="tel" required [attr.aria-invalid]="phoneFormatInvalid" (ngModelChange)="onPhoneInputChanged()" />
     </div>
   </div>
   <div class="login-links"><a routerLink="/forgot-password" class="text-button">{{ tr.t('Forgot password?') }}</a></div>
   <div class="field">
     <label>{{ tr.t('Password') }}</label>
-    <input type="password" [(ngModel)]="password" name="password" required />
+    <div class="password-field">
+      <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" autocomplete="current-password" required />
+      <button type="button" class="password-toggle" (click)="showPassword = !showPassword" [attr.aria-pressed]="showPassword" [attr.aria-label]="tr.t(showPassword ? 'Hide password' : 'Show password')">
+        @if (showPassword) {
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A11.8 11.8 0 0 1 12 5c5.2 0 9 4.2 10 7-.4 1.1-1.2 2.3-2.3 3.3M6.2 6.2C3.9 7.6 2.5 9.6 2 12c1 2.8 4.8 7 10 7 1.4 0 2.7-.3 3.8-.8" /></svg>
+        } @else {
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+        }
+      </button>
+    </div>
   </div>
   @if (error) {
-    <div class="form-error">{{ error }}</div>
+    <div class="form-error" role="alert">{{ error }}</div>
   }
   <div class="form-footer">
-    <button class="primary-button" [disabled]="loading">{{ tr.t('Continue') }}</button>
+    <button class="primary-button" type="submit" [disabled]="loading">{{ tr.t('Continue') }}</button>
     @if (role === 'contributor') {
       <a routerLink="/register" class="text-button">{{ tr.t('Create contributor account') }}</a>
     }

@@ -6,6 +6,7 @@ export const routes: Routes = [
   { path: 'login/:role', loadComponent: () => import('./pages/login/login').then(m => m.LoginComponent) },
   { path: 'forgot-password', loadComponent: () => import('./pages/forgot-password/forgot-password').then(m => m.ForgotPasswordComponent) },
   { path: 'change-password', loadComponent: () => import('./pages/change-password/change-password').then(m => m.ChangePasswordComponent) },
+  { path: 'support', canActivate: [roleGuard], data: { roles: ['contributor', 'agent', 'admin'] }, loadComponent: () => import('./pages/support/support').then(m => m.SupportComponent) },
   { path: 'register', loadComponent: () => import('./pages/register/register').then(m => m.RegisterComponent) },
   { path: 'dashboard', canActivate: [roleGuard], data: { roles: ['contributor'] }, loadComponent: () => import('./pages/dashboard/dashboard').then(m => m.DashboardComponent) },
   { path: 'catalog', loadComponent: () => import('./pages/catalog/catalog').then(m => m.CatalogComponent) },

@@ -3,6 +3,8 @@ import { ApiService } from './api.service';
 
 export interface WorkspaceSubmission {
   id: number;
+  submissionCode?: string;
+  hasDeliveryPackage?: boolean;
   contributorName: string;
   contributorPhone: string;
   language: string;
@@ -11,6 +13,7 @@ export interface WorkspaceSubmission {
   transcript: string;
   translation: string;
   status: string;
+  updatedAt: string;
   agentComment: string;
   adminComment: string;
   rejectionReason: string;
@@ -21,15 +24,26 @@ export interface WorkspaceSubmission {
 export interface WorkspaceData {
   role: 'contributor' | 'agent' | 'admin';
   submissions: WorkspaceSubmission[];
-  drafts?: Array<{ id: number; language: string; updatedAt: string }>;
+  drafts?: Array<{
+    id: number; ownerUserId: number; ownerName?: string; ownerPhone?: string;
+    assignedUserId: number | null; assignedUserName?: string; language: string;
+    durationSeconds: number; hasAudio?: boolean; hasTranscript?: boolean; hasTranslation?: boolean;
+    audioUrl?: string | null; transcript?: string; translation?: string; speakers?: unknown[];
+    recordingType?: string; updatedAt: string;
+  }>;
   users?: Array<{ id: number; name: string; phone: string; role: string; active: boolean; agentId?: number | null; referralCode?: string; registeredAt: string }>;
   contributors?: Array<{ id: number; name: string; phone: string; registeredAt: string }>;
   paymentRequests?: Array<{ id: number; userId: number; userName: string; userPhone: string; amount: number; currency: string; status: string; reviewNote: string; proofReference: string; requestedAt: string }>;
+  supportTickets?: Array<{
+    id: number; subject: string; status: string; createdById: number; createdByName: string;
+    createdByPhone: string; assignedAgentId: number | null; createdAt: string; updatedAt: string;
+    messages: Array<{ id: number; userId: number; name: string; role: string; body: string; createdAt: string }>;
+  }>;
   events?: Array<{ id: number; type: string; role: string; details: string; entity: string; entityId: string; createdAt: string }>;
   report?: { pendingReview: number; approved: number; returned: number; contributors: number; audioHours: number };
   balance?: number;
   referralCode?: string;
-  teamDrafts?: Array<{ id: number; contributorId: number; contributorName: string; language: string; durationSeconds: number; hasAudio: boolean; hasTranscript: boolean; hasTranslation: boolean; updatedAt: string }>;
+  teamDrafts?: Array<{ id: number; contributorId: number; contributorName: string; language: string; durationSeconds: number; hasAudio: boolean; hasTranscript: boolean; hasTranslation: boolean; recordingType: string; updatedAt: string }>;
 }
 
 @Injectable({ providedIn: 'root' })

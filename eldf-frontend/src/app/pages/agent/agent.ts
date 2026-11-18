@@ -9,12 +9,14 @@ import { ApiService } from '../../services/api.service';
 
 @Component({ selector: 'app-agent', standalone: true, imports: [CommonModule, FormsModule, RouterLink], templateUrl: './agent.html' })
 export class AgentComponent implements OnInit {
+  welcomeMessage = '';
   paymentNotes: Record<number, string> = {};
   paymentError = '';
   paymentBusyId: number | null = null;
   constructor(public tr: TranslateService, public auth: AuthService, public workspace: WorkspaceService, private api: ApiService) {}
   get user() { return this.auth.user(); }
   async ngOnInit() {
+    this.welcomeMessage = this.auth.consumeAgentNotice();
     await this.auth.ready;
     if (this.auth.user()?.role === 'agent') await this.workspace.load().catch(() => {});
   }

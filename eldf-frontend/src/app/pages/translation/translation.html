@@ -8,6 +8,7 @@
     <br><a routerLink="/dashboard" style="color:var(--green)">Go to dashboard →</a>
   </div>
 } @else {
+  @if (capture.storageWarning()) { <p class="form-error" role="alert">{{ tr.t(capture.storageWarning()) }}</p> }
   <section class="workspace-card">
     <div class="field">
       <label>{{ tr.t('Transcript') }}</label>
@@ -15,7 +16,7 @@
     </div>
     <div class="field">
       <label>{{ tr.t('Translation') }}</label>
-      <textarea [(ngModel)]="translation" name="translation" rows="5"
+      <textarea [ngModel]="translation" (ngModelChange)="saveTranslation($event)" name="translation" rows="5"
         placeholder="Translate the transcript while keeping its meaning."></textarea>
     </div>
     @if (error) { <div class="form-error">{{ error }}</div> }

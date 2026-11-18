@@ -47,6 +47,23 @@ public sealed class SpeakerProfile
     public string Dialect { get; set; } = "";
 }
 
+public sealed class SpeakerConsentRecord
+{
+    public int Id { get; set; }
+    public int UserAccountId { get; set; }
+    public UserAccount User { get; set; } = null!;
+    public int SpeakerProfileId { get; set; }
+    public SpeakerProfile Speaker { get; set; } = null!;
+    public string ConsentVersion { get; set; } = "speaker-consent-v1";
+    public string Language { get; set; } = "am";
+    public bool CoreConsent { get; set; }
+    public bool AiDevelopmentConsent { get; set; }
+    public bool ResearchSharingConsent { get; set; }
+    public bool PublicReleaseConsent { get; set; }
+    public DateTime ConsentedAtUtc { get; set; } = DateTime.UtcNow;
+    public DateTime? WithdrawnAtUtc { get; set; }
+}
+
 public sealed class WorkSubmission
 {
     public int Id { get; set; }
@@ -72,6 +89,20 @@ public sealed class WorkSubmission
     public string RewardCurrency { get; set; } = "ETB";
 }
 
+public static class SubmissionPackageNames
+{
+    public static string Create(string? fullName, int submissionId)
+    {
+        var nameParts = (fullName ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .Select(part => new string(part.Where(char.IsLetter).ToArray())).Where(part => part.Length > 0).ToArray();
+        var initials = nameParts.Select(part => char.ToUpperInvariant(part[0])).Take(2).ToList();
+        if (initials.Count < 2 && nameParts.Length > 0)
+            initials.AddRange(nameParts[0].Skip(1).Select(char.ToUpperInvariant).Take(2 - initials.Count));
+        while (initials.Count < 2) initials.Add('U');
+        return $"{new string(initials.ToArray())}{submissionId:D6}";
+    }
+}
+
 public sealed class AgentReferral
 {
     public int Id { get; set; }
@@ -86,6 +117,8 @@ public sealed class WorkDraft
     public int Id { get; set; }
     public int UserAccountId { get; set; }
     public UserAccount User { get; set; } = null!;
+    public int? AssignedUserAccountId { get; set; }
+    public UserAccount? AssignedUser { get; set; }
     public string ProjectLanguage { get; set; } = "";
     public string TranslationLanguage { get; set; } = "";
     public string AudioPath { get; set; } = "";
@@ -218,6 +251,7 @@ public sealed class EldfDbContext(DbContextOptions<EldfDbContext> options) : DbC
     public DbSet<UserAccount> Users => Set<UserAccount>();
     public DbSet<LoginSession> Sessions => Set<LoginSession>();
     public DbSet<SpeakerProfile> Speakers => Set<SpeakerProfile>();
+    public DbSet<SpeakerConsentRecord> SpeakerConsents => Set<SpeakerConsentRecord>();
     public DbSet<WorkSubmission> Submissions => Set<WorkSubmission>();
     public DbSet<AgentReferral> AgentReferrals => Set<AgentReferral>();
     public DbSet<WorkDraft> Drafts => Set<WorkDraft>();
@@ -257,6 +291,19 @@ public sealed class EldfDbContext(DbContextOptions<EldfDbContext> options) : DbC
             e.Property(x => x.Gender).HasColumnName("gender").HasMaxLength(40); e.Property(x => x.Education).HasColumnName("education").HasMaxLength(100);
             e.Property(x => x.Language).HasColumnName("language").HasMaxLength(160); e.Property(x => x.Region).HasColumnName("region").HasMaxLength(160); e.Property(x => x.Dialect).HasColumnName("dialect").HasMaxLength(160);
         });
+        model.Entity<SpeakerConsentRecord>(e =>
+        {
+            e.ToTable("eldf_speaker_consents"); e.HasIndex(x => new { x.SpeakerProfileId, x.ConsentedAtUtc }).HasDatabaseName("IX_eldf_speaker_consents_profile_date");
+            e.Property(x => x.Id).HasColumnName("id"); e.Property(x => x.UserAccountId).HasColumnName("user_id");
+            e.Property(x => x.SpeakerProfileId).HasColumnName("speaker_profile_id");
+            e.Property(x => x.ConsentVersion).HasColumnName("consent_version").HasMaxLength(80);
+            e.Property(x => x.Language).HasColumnName("language").HasMaxLength(8);
+            e.Property(x => x.CoreConsent).HasColumnName("core_consent"); e.Property(x => x.AiDevelopmentConsent).HasColumnName("ai_development_consent");
+            e.Property(x => x.ResearchSharingConsent).HasColumnName("research_sharing_consent"); e.Property(x => x.PublicReleaseConsent).HasColumnName("public_release_consent");
+            e.Property(x => x.ConsentedAtUtc).HasColumnName("consented_at"); e.Property(x => x.WithdrawnAtUtc).HasColumnName("withdrawn_at");
+            e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserAccountId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.Speaker).WithMany().HasForeignKey(x => x.SpeakerProfileId).OnDelete(DeleteBehavior.NoAction);
+        });
         model.Entity<WorkSubmission>(e =>
         {
             e.ToTable("eldf_submissions"); e.Property(x => x.Id).HasColumnName("id"); e.Property(x => x.UserAccountId).HasColumnName("user_id");
@@ -282,13 +329,16 @@ public sealed class EldfDbContext(DbContextOptions<EldfDbContext> options) : DbC
         model.Entity<WorkDraft>(e =>
         {
             e.ToTable("eldf_work_drafts"); e.HasIndex(x => new { x.UserAccountId, x.UpdatedAtUtc });
+            e.HasIndex(x => new { x.AssignedUserAccountId, x.UpdatedAtUtc }).HasDatabaseName("IX_eldf_work_drafts_assigned_user_id_updated_at");
             e.Property(x => x.Id).HasColumnName("id"); e.Property(x => x.UserAccountId).HasColumnName("user_id");
+            e.Property(x => x.AssignedUserAccountId).HasColumnName("assigned_user_id");
             e.Property(x => x.ProjectLanguage).HasColumnName("project_language").HasMaxLength(160); e.Property(x => x.TranslationLanguage).HasColumnName("translation_language").HasMaxLength(160);
             e.Property(x => x.AudioPath).HasColumnName("audio_path").HasMaxLength(500); e.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
             e.Property(x => x.Transcript).HasColumnName("transcript"); e.Property(x => x.Translation).HasColumnName("translation");
             e.Property(x => x.SpeakersJson).HasColumnName("speakers_json"); e.Property(x => x.RecordingType).HasColumnName("recording_type").HasMaxLength(80);
             e.Property(x => x.ConsentReference).HasColumnName("consent_reference").HasMaxLength(80); e.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at");
             e.HasOne(x => x.User).WithMany().HasForeignKey(x => x.UserAccountId).OnDelete(DeleteBehavior.NoAction);
+            e.HasOne(x => x.AssignedUser).WithMany().HasForeignKey(x => x.AssignedUserAccountId).OnDelete(DeleteBehavior.NoAction);
         });
         model.Entity<WorkReviewEvent>(e =>
         {
@@ -380,4 +430,6 @@ public sealed class EldfDbContext(DbContextOptions<EldfDbContext> options) : DbC
 public sealed record UserView(int id, string name, string phone, string role, string language);
 // `name` is new and `dialect` is no longer collected by the form, but both stay on the record
 // so older clients and the rows already stored keep working.
-public sealed record SpeakerInput(string? speakerId, string? name, string? ageRange, string? gender, string? educationLevel, string? preferredLanguage, string? region, string? dialect);
+public sealed record SpeakerInput(string? speakerId, string? name, string? ageRange, string? gender, string? educationLevel, string? preferredLanguage, string? region, string? dialect,
+    bool CoreConsent = false, bool AiDevelopmentConsent = false, bool ResearchSharingConsent = false, bool PublicReleaseConsent = false,
+    string? ConsentVersion = null, string? ConsentLanguage = null);

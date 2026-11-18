@@ -16,6 +16,7 @@ export class AuthService {
   private readonly API = '/api/auth';
   user = signal<User | null>(null);
   lang = signal<'am' | 'en'>('am');
+  private pendingAgentNotice = '';
   readonly ready: Promise<void>;
 
   constructor(private http: HttpClient, private router: Router) {
@@ -39,7 +40,18 @@ export class AuthService {
     const res: any = await firstValueFrom(this.http.post(`${this.API}/login`, data, { withCredentials: true }));
     this.user.set(res.user);
     this.lang.set(res.user.language === 'en' ? 'en' : 'am');
+    this.pendingAgentNotice = res.agentNotice ?? '';
     return res.user;
+  }
+
+  consumeAgentNotice() {
+    const notice = this.pendingAgentNotice;
+    this.pendingAgentNotice = '';
+    return notice;
+  }
+
+  updateCurrentUser(user: User) {
+    this.user.set(user);
   }
 
   async logout(navigate = true) {

@@ -2,14 +2,30 @@
   <div><div class="eyebrow">CONTRIBUTE · 04</div><h1>{{ tr.t('Transcription') }}</h1></div>
 </div>
 <section class="workspace-card">
+  @if (capture.storageWarning()) { <p class="form-error" role="alert">{{ tr.t(capture.storageWarning()) }}</p> }
   <p>{{ tr.t('Preserve the original spoken words. Do not guess. Mark unclear speech.') }}</p>
+  @if (audioUrl) {
+    <div class="field">
+      <label>{{ tr.t('Listen to your recording while transcribing') }}</label>
+      @for (url of audioUrls; track $index) {
+        <div class="recording-segment">
+          <label>{{ tr.t('Recording part') }} {{ $index + 1 }}</label>
+          <audio class="transcription-audio" controls preload="metadata" [src]="url"></audio>
+        </div>
+      } @if (!audioUrls.length) {
+        <audio class="transcription-audio" controls preload="metadata" [src]="audioUrl"></audio>
+      }
+    </div>
+  } @else {
+    <p class="form-error">{{ tr.t('No recording is available. Return to recording and record or select an audio file first.') }}</p>
+  }
   <div class="field">
     <label>{{ tr.t('Transcript') }}</label>
-    <textarea [(ngModel)]="transcript" name="transcript" rows="10"
+    <textarea [ngModel]="transcript" (ngModelChange)="saveTranscript($event)" name="transcript" rows="10"
       placeholder="Type what you hear in the original script..."></textarea>
   </div>
   <div class="form-footer">
-    <button class="primary-button" (click)="next()" [disabled]="!transcript.trim()">
+    <button class="primary-button" (click)="next()" [disabled]="!audioUrl || !transcript.trim()">
       {{ tr.t('Continue') }} →
     </button>
   </div>

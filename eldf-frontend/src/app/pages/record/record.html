@@ -7,6 +7,7 @@
     <span class="studio-kicker">{{ tr.t('Recording Studio') }} · {{ capture.language() || tr.t('Choose a project') }}</span>
   </div>
   <div class="studio-main">
+    @if (capture.storageWarning()) { <p class="form-error" role="alert">{{ tr.t(capture.storageWarning()) }}</p> }
     @if (state === 'testReady' || state === 'testing' || state === 'testReview') {
       <section class="mic-test-panel">
         <div class="studio-mic-orb"><svg viewBox="0 0 24 24"><path d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3Z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v4m-4 0h8"/></svg></div>
@@ -19,8 +20,9 @@
         }
         @if (state === 'testing') {
           <div class="record-status is-recording"><span class="status-indicator"></span><span>{{ tr.t('Microphone test in progress') }}</span></div>
+          <div class="microphone-meter" role="meter" [attr.aria-valuenow]="microphoneLevel" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="tr.t('Microphone level')"><span [style.width.%]="microphoneLevel"></span></div>
           <div class="record-clock">{{ test_clock_display }}</div>
-          <p>{{ tr.t('Time remaining') }}</p>
+          <p>{{ tr.t('Elapsed test time') }}</p>
         }
         @if (state === 'testReview') {
           <div class="test-feedback" role="status" aria-live="polite">
@@ -30,6 +32,7 @@
           @if (testAudioUrl) { <audio class="test-audio-preview" controls [src]="testAudioUrl"></audio> }
           <div class="studio-control-row">
             <button class="studio-control-button" (click)="retryTest()">{{ tr.t('Test again') }}</button>
+            @if (testAudioUrl) { <button class="studio-control-button" (click)="download(testAudioUrl, testAudioType, 'microphone-test')">{{ tr.t('Download sample') }}</button> }
             <button class="primary-button" (click)="continueToRecording()">{{ tr.t('Continue to recording') }} →</button>
           </div>
         }
@@ -46,6 +49,9 @@
         <span>{{ state === 'recording' ? tr.t('Recording') : state === 'paused' ? tr.t('Paused') : state === 'done' ? tr.t('Completed') : tr.t('Ready') }}</span>
       </div>
       <div class="record-clock">{{ clock_display }}</div>
+      @if (state === 'recording' || state === 'paused') {
+        <div class="microphone-meter" role="meter" [attr.aria-valuenow]="microphoneLevel" aria-valuemin="0" aria-valuemax="100" [attr.aria-label]="tr.t('Microphone level')"><span [style.width.%]="microphoneLevel"></span></div>
+      }
       @if (capture.topics.length) {
         <section class="recording-topics" aria-label="{{ tr.t('Selected topics') }}">
           <strong>{{ tr.t('Selected topics') }}</strong>
@@ -71,10 +77,21 @@
           }
         </div>
       </div>
-      @if (state === 'done' && audioUrl) {
+      @if (state === 'done' && audioBlob) {
         <div class="studio-player">
+          @if (recoveredDraft) { <p class="status-pill" role="status">{{ tr.t('Your interrupted recording was restored from this browser.') }}</p> }
           <strong>{{ tr.t('Completed recording') }}</strong>
-          <audio controls [src]="audioUrl"></audio>
+          @for (segmentUrl of audioSegmentUrls; track $index) {
+            <div class="recording-segment">
+              <span>{{ tr.t('Recording part') }} {{ $index + 1 }}</span>
+              <audio controls [src]="segmentUrl"></audio>
+              <button class="studio-control-button" (click)="download(segmentUrl, capture.audioSegments[$index]?.type || 'audio/webm', 'recording-part-' + ($index + 1))">{{ tr.t('Download part') }}</button>
+            </div>
+          }
+          <div class="studio-control-row">
+            @if (recoveredDraft) { <button class="studio-control-button" (click)="continueInterruptedRecording()">{{ tr.t('Continue recording') }}</button> }
+            <button class="studio-control-button" (click)="retryRecording()">{{ tr.t('Record again') }}</button>
+          </div>
           <div class="studio-footer"><button class="primary-button" (click)="proceed()">{{ tr.t('Write transcription') }} →</button></div>
         </div>
       }

@@ -9,6 +9,9 @@ export class ChangePasswordComponent {
   currentPassword = '';
   newPassword = '';
   confirmPassword = '';
+  showCurrentPassword = false;
+  showNewPassword = false;
+  showConfirmPassword = false;
   error = '';
   message = '';
   loading = false;

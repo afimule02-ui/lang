@@ -33,8 +33,31 @@ export const AFRICAN_PHONE_COUNTRIES: AfricanPhoneCountry[] = [
 export function internationalPhoneNumber(value: string, dialCode: string): string {
   const trimmed = value.trim();
   const digits = trimmed.replace(/\D/g, '');
-  if (trimmed.startsWith('+')) return `+${digits}`;
-  if (trimmed.startsWith('00')) return `+${digits.slice(2)}`;
-  if (digits.startsWith(dialCode)) return `+${digits}`;
-  return `+${dialCode}${digits.replace(/^0+/, '')}`;
+  const code = dialCode.replace(/\D/g, '');
+  const hasInternationalPrefix = trimmed.startsWith('+') || trimmed.startsWith('00');
+  const internationalDigits = trimmed.startsWith('00') ? digits.slice(2) : digits;
+
+  if (hasInternationalPrefix) {
+    const matchedCode = [code, ...AFRICAN_PHONE_COUNTRIES.map(country => country.dialCode)]
+      .filter(Boolean)
+      .sort((left, right) => right.length - left.length)
+      .find(candidate => internationalDigits.startsWith(candidate));
+    if (matchedCode) {
+      const nationalNumber = internationalDigits.slice(matchedCode.length).replace(/^0+/, '');
+      return `+${matchedCode}${nationalNumber}`;
+    }
+    return `+${internationalDigits}`;
+  }
+
+  const includesCountryCode = code && digits.startsWith(code) && digits.length > code.length + 6;
+  const nationalNumber = (includesCountryCode ? digits.slice(code.length) : digits).replace(/^0+/, '');
+  return `+${code}${nationalNumber}`;
+}
+
+export function isValidPhoneNumber(value: string, dialCode: string): boolean {
+  const trimmed = value.trim();
+  if (!trimmed || !/^(?:\+|00)?[\d\s().-]+$/.test(trimmed)) return false;
+
+  const normalized = internationalPhoneNumber(trimmed, dialCode);
+  return /^\+[1-9]\d{6,14}$/.test(normalized);
 }

@@ -23,12 +23,30 @@
     </div>
     <div class="field">
       <label>{{ tr.t('Password') }} *</label>
-      <input type="password" [(ngModel)]="password" name="password" minlength="10" required />
+      <div class="password-field">
+        <input [type]="showPassword ? 'text' : 'password'" [(ngModel)]="password" name="password" autocomplete="new-password" minlength="10" required />
+        <button type="button" class="password-toggle" (click)="showPassword = !showPassword" [attr.aria-pressed]="showPassword" [attr.aria-label]="tr.t(showPassword ? 'Hide password' : 'Show password')">
+          @if (showPassword) {
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A11.8 11.8 0 0 1 12 5c5.2 0 9 4.2 10 7-.4 1.1-1.2 2.3-2.3 3.3M6.2 6.2C3.9 7.6 2.5 9.6 2 12c1 2.8 4.8 7 10 7 1.4 0 2.7-.3 3.8-.8" /></svg>
+          } @else {
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+          }
+        </button>
+      </div>
       <small>At least 10 characters</small>
     </div>
     <div class="field">
       <label>{{ tr.t('Confirm password') }} *</label>
-      <input type="password" [(ngModel)]="passwordConfirm" name="passwordConfirm" minlength="10" required />
+      <div class="password-field">
+        <input [type]="showPasswordConfirm ? 'text' : 'password'" [(ngModel)]="passwordConfirm" name="passwordConfirm" autocomplete="new-password" minlength="10" required />
+        <button type="button" class="password-toggle" (click)="showPasswordConfirm = !showPasswordConfirm" [attr.aria-pressed]="showPasswordConfirm" [attr.aria-label]="tr.t(showPasswordConfirm ? 'Hide password' : 'Show password')">
+          @if (showPasswordConfirm) {
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A11.8 11.8 0 0 1 12 5c5.2 0 9 4.2 10 7-.4 1.1-1.2 2.3-2.3 3.3M6.2 6.2C3.9 7.6 2.5 9.6 2 12c1 2.8 4.8 7 10 7 1.4 0 2.7-.3 3.8-.8" /></svg>
+          } @else {
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+          }
+        </button>
+      </div>
     </div>
     <div class="field">
       <label>{{ tr.t('Preferred interface language') }}</label>
@@ -45,7 +63,16 @@
   </div>
   <div class="field">
     <label>{{ tr.t('Staff invitation code (if you have one)') }}</label>
-    <input type="password" [(ngModel)]="staffCode" name="staff_code" autocomplete="off" />
+    <div class="password-field">
+      <input [type]="showStaffCode ? 'text' : 'password'" [(ngModel)]="staffCode" name="staff_code" autocomplete="off" />
+      <button type="button" class="password-toggle" (click)="showStaffCode = !showStaffCode" [attr.aria-pressed]="showStaffCode" [attr.aria-label]="tr.t(showStaffCode ? 'Hide invitation code' : 'Show invitation code')">
+        @if (showStaffCode) {
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 5.2A11.8 11.8 0 0 1 12 5c5.2 0 9 4.2 10 7-.4 1.1-1.2 2.3-2.3 3.3M6.2 6.2C3.9 7.6 2.5 9.6 2 12c1 2.8 4.8 7 10 7 1.4 0 2.7-.3 3.8-.8" /></svg>
+        } @else {
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></svg>
+        }
+      </button>
+    </div>
     <small>{{ tr.t('Leave this empty unless an administrator gave you a staff code.') }}</small>
   </div>
   <section class="consent-box">

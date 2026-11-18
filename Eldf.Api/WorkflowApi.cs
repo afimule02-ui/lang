@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.IO.Compression;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using Eldf.Api;
@@ -113,10 +115,47 @@ public static class WorkflowApiExtensions
             return Results.Json(new { ok = true });
         });
 
+        app.MapPatch("/api/auth/admin-profile", async (HttpRequest request, EldfDbContext db) =>
+        {
+            var admin = await SessionAuth.CurrentUser(request, db);
+            if (admin is null) return Problem(401, "Please sign in to continue.");
+            if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
+            var input = await request.ReadFromJsonAsync<AdminProfileUpdateInput>(JsonOptions);
+            var name = input?.FullName?.Trim() ?? "";
+            var phone = NormalizeInternationalPhone(input?.Phone ?? "");
+            if (name.Length is < 2 or > 160) return Problem(422, "Enter a name between 2 and 160 characters.");
+            var phoneDigits = string.Concat(phone.Where(char.IsDigit));
+            if (!phone.StartsWith('+') || phoneDigits.Length is < 8 or > 15) return Problem(422, "Enter a valid international phone number.");
+            if (!VerifyPassword(input?.CurrentPassword ?? "", admin.PasswordHash)) return Problem(422, "The current password is incorrect.");
+            if (await db.Users.AnyAsync(x => x.Id != admin.Id && x.Phone == phone)) return Problem(409, "Another account already uses that phone number.");
+            admin.FullName = name;
+            admin.Phone = phone;
+            var token = request.Cookies["eldf_session"] ?? "";
+            var tokenHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(token))).ToLowerInvariant();
+            var otherSessions = await db.Sessions.Where(x => x.UserAccountId == admin.Id && x.TokenHash != tokenHash).ToListAsync();
+            db.Sessions.RemoveRange(otherSessions);
+            await db.SaveChangesAsync();
+            await WorkflowEvents.RecordAsync(db, admin, "Administrator profile updated", "User", admin.Id.ToString());
+            return Results.Json(new { user = View(admin) });
+        });
+
         app.MapGet("/api/site-content", async (EldfDbContext db) =>
         {
             var content = await db.SiteContents.AsNoTracking().SingleOrDefaultAsync(x => x.Id == 1);
             return Results.Json(new { vision = new { am = AfricanWideCopy(content?.Vision, DefaultVision), en = AfricanWideCopy(content?.VisionEnglish, DefaultVisionEnglish) }, mission = new { am = AfricanWideCopy(content?.Mission, DefaultMission), en = AfricanWideCopy(content?.MissionEnglish, DefaultMissionEnglish) } });
+        });
+
+        app.MapGet("/api/admin/speaker-consents", async (HttpRequest request, EldfDbContext db) =>
+        {
+            var admin = await SessionAuth.CurrentUser(request, db);
+            if (admin is null) return Problem(401, "Please sign in to continue.");
+            if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
+            var records = await db.SpeakerConsents.AsNoTracking().Include(x => x.Speaker).Include(x => x.User)
+                .OrderByDescending(x => x.ConsentedAtUtc).Take(2000)
+                .Select(x => new { x.Id, x.UserAccountId, userName = x.User.FullName, x.SpeakerProfileId, x.Speaker.SpeakerId,
+                    x.ConsentVersion, x.Language, x.CoreConsent, x.AiDevelopmentConsent, x.ResearchSharingConsent,
+                    x.PublicReleaseConsent, x.ConsentedAtUtc, x.WithdrawnAtUtc }).ToListAsync();
+            return Results.Json(records);
         });
 
         app.MapGet("/api/workspace", async (HttpRequest request, EldfDbContext db) =>
@@ -134,12 +173,19 @@ public static class WorkflowApiExtensions
                 var events = await db.ActivityEvents.AsNoTracking().OrderByDescending(x => x.CreatedAtUtc).Take(500).ToListAsync();
                 var reviews = await ReviewHistory(db, submissions.Select(x => x.Id).ToList());
                 var referrals = await db.AgentReferrals.AsNoTracking().ToDictionaryAsync(x => x.AgentUserId, x => x.Code);
+                var deliveryReadyIds = await db.AudioProcessing.AsNoTracking()
+                    .Where(x => x.Status == "done" && x.DeliveryZipPath != "")
+                    .Select(x => x.SubmissionId).ToListAsync();
+                var deliveryReady = deliveryReadyIds.ToHashSet();
+                var drafts = await db.Drafts.AsNoTracking().Include(x => x.User).Include(x => x.AssignedUser)
+                    .OrderByDescending(x => x.UpdatedAtUtc).Take(1000).ToListAsync();
                 return Results.Json(new
                 {
                     role = user.Role,
                     profile = View(user),
                     users = users.Select(x => AdminUserView(x, referrals.GetValueOrDefault(x.Id))).ToList(),
-                    submissions = submissions.Select(x => SubmissionView(x, reviews.GetValueOrDefault(x.Id, []))).ToList(),
+                    submissions = submissions.Select(x => SubmissionView(x, reviews.GetValueOrDefault(x.Id, []), deliveryReady.Contains(x.Id))).ToList(),
+                    drafts = drafts.Select(x => AdminDraftView(x)).ToList(),
                     supportTickets = tickets.Select(TicketView).ToList(),
                     paymentRequests = payments.Select(PaymentView).ToList(),
                     siteContent = new { vision = new { am = AfricanWideCopy(content?.Vision, DefaultVision), en = AfricanWideCopy(content?.VisionEnglish, DefaultVisionEnglish) }, mission = new { am = AfricanWideCopy(content?.Mission, DefaultMission), en = AfricanWideCopy(content?.MissionEnglish, DefaultMissionEnglish) } },
@@ -170,7 +216,7 @@ public static class WorkflowApiExtensions
                 // Metadata only: no transcript, no translation, no audio URL. The agent reads the
                 // content once the contributor submits it for review.
                 var teamDrafts = await db.Drafts.AsNoTracking().Include(x => x.User)
-                    .Where(x => teamIds.Contains(x.UserAccountId))
+                    .Where(x => teamIds.Contains(x.UserAccountId) || (x.AssignedUserAccountId.HasValue && teamIds.Contains(x.AssignedUserAccountId.Value)))
                     .OrderByDescending(x => x.UpdatedAtUtc).Take(300)
                     .Select(x => new
                     {
@@ -207,7 +253,9 @@ public static class WorkflowApiExtensions
                 .Where(x => x.CreatedByUserId == user.Id).OrderByDescending(x => x.UpdatedAtUtc).Take(100).ToListAsync();
             var ownPayments = await db.PaymentRequests.AsNoTracking().Include(x => x.User).Where(x => x.UserAccountId == user.Id)
                 .OrderByDescending(x => x.RequestedAtUtc).Take(100).ToListAsync();
-            var ownDrafts = await db.Drafts.AsNoTracking().Where(x => x.UserAccountId == user.Id).OrderByDescending(x => x.UpdatedAtUtc).Take(100).ToListAsync();
+            var ownDrafts = await db.Drafts.AsNoTracking().Include(x => x.User).Include(x => x.AssignedUser)
+                .Where(x => x.UserAccountId == user.Id || x.AssignedUserAccountId == user.Id)
+                .OrderByDescending(x => x.UpdatedAtUtc).Take(100).ToListAsync();
             var ownReviews = await ReviewHistory(db, ownSubmissions.Select(x => x.Id).ToList());
             return Results.Json(new
             {
@@ -234,11 +282,32 @@ public static class WorkflowApiExtensions
             return Results.File(fullPath, AudioContentType(fullPath), enableRangeProcessing: true);
         });
 
+        app.MapGet("/api/drafts/{id:int}", async (int id, HttpRequest request, EldfDbContext db) =>
+        {
+            var user = await SessionAuth.CurrentUser(request, db);
+            if (user is null) return Problem(401, "Please sign in to continue.");
+            var draft = await db.Drafts.AsNoTracking().Include(x => x.User).Include(x => x.AssignedUser)
+                .SingleOrDefaultAsync(x => x.Id == id && (x.UserAccountId == user.Id || x.AssignedUserAccountId == user.Id || user.Role == "admin"));
+            if (draft is null) return Problem(404, "The saved draft was not found.");
+            var speakerIds = JsonSerializer.Deserialize<List<string>>(SafeJsonArray(draft.SpeakersJson)) ?? [];
+            var profiles = await db.Speakers.AsNoTracking().Where(x => x.UserAccountId == draft.UserAccountId && speakerIds.Contains(x.SpeakerId)).ToListAsync();
+            var profileIds = profiles.Select(x => x.Id).ToArray();
+            var latestConsents = await db.SpeakerConsents.AsNoTracking()
+                .Where(x => x.UserAccountId == draft.UserAccountId && profileIds.Contains(x.SpeakerProfileId) && x.ConsentVersion == "speaker-consent-v1")
+                .OrderByDescending(x => x.ConsentedAtUtc).ToListAsync();
+            var currentBySpeaker = profiles.ToDictionary(profile => profile.SpeakerId, profile =>
+            {
+                var latest = latestConsents.FirstOrDefault(consent => consent.SpeakerProfileId == profile.Id);
+                return latest is { CoreConsent: true, WithdrawnAtUtc: null };
+            }, StringComparer.Ordinal);
+            return Results.Json(DraftResumeView(draft, speakerIds, currentBySpeaker));
+        });
+
         app.MapGet("/api/drafts/{id:int}/audio", async (int id, HttpRequest request, EldfDbContext db, IConfiguration configuration, IWebHostEnvironment environment) =>
         {
             var user = await SessionAuth.CurrentUser(request, db);
             if (user is null) return Problem(401, "Please sign in to continue.");
-            var draft = await db.Drafts.SingleOrDefaultAsync(x => x.Id == id && x.UserAccountId == user.Id);
+            var draft = await db.Drafts.SingleOrDefaultAsync(x => x.Id == id && (x.UserAccountId == user.Id || x.AssignedUserAccountId == user.Id || user.Role == "admin"));
             if (draft is null) return Problem(404, "The saved draft was not found.");
             var fullPath = SafeDataPath(configuration, environment, draft.AudioPath);
             if (fullPath is null || !File.Exists(fullPath)) return Problem(404, "The draft audio is not available.");
@@ -252,7 +321,7 @@ public static class WorkflowApiExtensions
             if (user.Role is not ("contributor" or "agent")) return Problem(403, "This role cannot save contributor drafts.");
             var form = await request.ReadFormAsync();
             var id = int.TryParse(form["draft_id"], out var parsed) ? parsed : 0;
-            WorkDraft? draft = id > 0 ? await db.Drafts.SingleOrDefaultAsync(x => x.Id == id && x.UserAccountId == user.Id) : null;
+            WorkDraft? draft = id > 0 ? await db.Drafts.SingleOrDefaultAsync(x => x.Id == id && (x.UserAccountId == user.Id || x.AssignedUserAccountId == user.Id)) : null;
             if (id > 0 && draft is null) return Problem(404, "The saved draft was not found.");
             draft ??= new WorkDraft { UserAccountId = user.Id, ProjectLanguage = "" };
             draft.ProjectLanguage = WorkflowEvents.Limit(form["language"], 160);
@@ -264,27 +333,71 @@ public static class WorkflowApiExtensions
             draft.SpeakersJson = SafeJsonArray(form["speakers_json"].ToString());
             draft.DurationSeconds = int.TryParse(form["duration_seconds"], out var duration) ? Math.Clamp(duration, 0, 3600) : draft.DurationSeconds;
             draft.UpdatedAtUtc = DateTime.UtcNow;
+            var audioSegments = form.Files.GetFiles("audio_segments");
             var file = form.Files.GetFile("file");
+            if (audioSegments.Count > 0 && file is not null) return Problem(422, "Upload either one recording or its recording parts, not both.");
+            IReadOnlyList<IFormFile> audioFiles = audioSegments.Count > 0
+                ? audioSegments
+                : file is null ? Array.Empty<IFormFile>() : [file];
+            var maxBytes = configuration.GetValue<long>("Audio:MaxBytes", 250L * 1024 * 1024);
+            if (audioFiles.Count > 100 || audioFiles.Any(item => item.Length == 0) || audioFiles.Sum(item => item.Length) > maxBytes)
+                return Problem(413, "The draft audio is empty, has too many parts, or is larger than the server upload limit.");
             string? newPath = null;
-            if (file is { Length: > 0 })
+            if (audioFiles.Count > 0)
             {
-                if (file.Length > configuration.GetValue<long>("Audio:MaxBytes", 250L * 1024 * 1024)) return Problem(413, "The draft audio is too large.");
-                var folder = Path.Combine(DataDirectory(configuration, environment), "drafts", user.Id.ToString());
+                var folder = Path.Combine(DataDirectory(configuration, environment), "drafts", draft.UserAccountId.ToString());
                 Directory.CreateDirectory(folder);
-                var ext = SafeExtension(file.FileName);
-                newPath = Path.Combine("drafts", user.Id.ToString(), Guid.NewGuid().ToString("N") + ext);
+                var ext = audioFiles.Count > 1 ? ".webm" : SafeExtension(audioFiles[0].FileName);
+                newPath = Path.Combine("drafts", draft.UserAccountId.ToString(), Guid.NewGuid().ToString("N") + ext);
                 var full = SafeDataPath(configuration, environment, newPath);
                 if (full is null) return Problem(400, "Invalid audio path.");
                 Directory.CreateDirectory(Path.GetDirectoryName(full)!);
-                await using var output = File.Create(full);
-                await file.CopyToAsync(output);
+                var partPaths = new List<string>();
+                var mergedTemp = Path.Combine(Path.GetTempPath(), $"eldf-draft-{Guid.NewGuid():N}.webm");
+                try
+                {
+                    if (audioFiles.Count == 1)
+                    {
+                        await using var output = File.Create(full);
+                        await audioFiles[0].CopyToAsync(output);
+                    }
+                    else
+                    {
+                        foreach (var audioFile in audioFiles)
+                        {
+                            var partExtension = audioFile.ContentType.Contains("ogg", StringComparison.OrdinalIgnoreCase) ? ".ogg"
+                                : audioFile.ContentType.Contains("mp4", StringComparison.OrdinalIgnoreCase) ? ".m4a"
+                                : audioFile.ContentType.Contains("wav", StringComparison.OrdinalIgnoreCase) ? ".wav" : ".webm";
+                            var partPath = Path.Combine(Path.GetTempPath(), $"eldf-draft-part-{Guid.NewGuid():N}{partExtension}");
+                            partPaths.Add(partPath);
+                            await using var output = File.Create(partPath);
+                            await audioFile.CopyToAsync(output);
+                        }
+                        var arguments = new List<string> { "-y" };
+                        foreach (var partPath in partPaths) arguments.AddRange(["-i", partPath]);
+                        var streams = string.Concat(Enumerable.Range(0, partPaths.Count).Select(index => $"[{index}:a:0]"));
+                        arguments.AddRange(["-filter_complex", $"{streams}concat=n={partPaths.Count}:v=0:a=1[outa]", "-map", "[outa]", "-vn", "-c:a", "libopus", "-b:a", "64k", "-ac", "1", "-ar", "48000", mergedTemp]);
+                        await RunProcessForDrafts(configuration["Audio:FfmpegPath"] ?? "ffmpeg", arguments);
+                        File.Move(mergedTemp, full);
+                    }
+                }
+                catch
+                {
+                    if (File.Exists(full)) File.Delete(full);
+                    throw;
+                }
+                finally
+                {
+                    if (File.Exists(mergedTemp)) File.Delete(mergedTemp);
+                    foreach (var partPath in partPaths) if (File.Exists(partPath)) File.Delete(partPath);
+                }
             }
             var oldPath = draft.AudioPath;
             if (newPath is not null) draft.AudioPath = newPath;
             if (id == 0) db.Drafts.Add(draft);
             await db.SaveChangesAsync();
             if (newPath is not null && oldPath.Length > 0) DeleteSafeDataFile(configuration, environment, oldPath);
-            await WorkflowEvents.RecordAsync(db, user, id == 0 ? "Work draft created" : "Work draft saved", "Draft", draft.Id.ToString(), draft.ProjectLanguage);
+            if (id == 0) await WorkflowEvents.RecordAsync(db, user, "Work draft created", "Draft", draft.Id.ToString(), draft.ProjectLanguage);
             return Results.Json(DraftView(draft));
         });
 
@@ -305,6 +418,7 @@ public static class WorkflowApiExtensions
         {
             var user = await SessionAuth.CurrentUser(request, db);
             if (user is null) return Problem(401, "Please sign in to continue.");
+            if (user.Role != "contributor") return Problem(403, "Contributor access is required.");
             var submission = await db.Submissions.SingleOrDefaultAsync(x => x.Id == id && x.UserAccountId == user.Id);
             if (submission is null) return Problem(404, "The work was not found.");
             if (submission.Status is not ("Returned by agent" or "Returned by admin" or "Returned for correction")) return Problem(409, "This work is not waiting for a correction.");
@@ -384,6 +498,29 @@ public static class WorkflowApiExtensions
             return Results.Json(users.Select(x => AdminUserView(x, referrals.GetValueOrDefault(x.Id))));
         });
 
+        app.MapPatch("/api/admin/drafts/{id:int}/assignment", async (int id, HttpRequest request, EldfDbContext db) =>
+        {
+            var admin = await SessionAuth.CurrentUser(request, db);
+            if (admin is null) return Problem(401, "Please sign in to continue.");
+            if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
+            var input = await request.ReadFromJsonAsync<AdminDraftAssignmentInput>(JsonOptions);
+            var draft = await db.Drafts.Include(x => x.User).SingleOrDefaultAsync(x => x.Id == id);
+            if (draft is null) return Problem(404, "The interrupted work was not found.");
+            var targetId = input?.AssignedUserId;
+            if (targetId.HasValue)
+            {
+                var target = await db.Users.SingleOrDefaultAsync(x => x.Id == targetId.Value && x.IsActive && x.Role == "contributor");
+                if (target is null) return Problem(422, "Choose an active contributor to receive this work.");
+                if (target.Id == draft.UserAccountId) draft.AssignedUserAccountId = null;
+                else draft.AssignedUserAccountId = target.Id;
+            }
+            else draft.AssignedUserAccountId = null;
+            draft.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            await WorkflowEvents.RecordAsync(db, admin, "Interrupted work reassigned", "Draft", draft.Id.ToString(), draft.AssignedUserAccountId?.ToString() ?? draft.UserAccountId.ToString());
+            return Results.Json(new { id = draft.Id, ownerUserId = draft.UserAccountId, assignedUserId = draft.AssignedUserAccountId });
+        });
+
         app.MapPatch("/api/admin/users/{id:int}", async (int id, HttpRequest request, EldfDbContext db) =>
         {
             var admin = await SessionAuth.CurrentUser(request, db);
@@ -391,6 +528,7 @@ public static class WorkflowApiExtensions
             if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
             var target = await db.Users.SingleOrDefaultAsync(x => x.Id == id);
             if (target is null) return Problem(404, "The account was not found.");
+            var previousRole = target.Role;
             var input = await request.ReadFromJsonAsync<AdminUserUpdateInput>(JsonOptions);
             if (input is null || input.Role is not ("contributor" or "agent" or "admin")) return Problem(422, "Choose a valid account role.");
             if (target.Id == admin.Id && input.Role != "admin") return Problem(409, "You cannot remove your own administrator role while signed in.");
@@ -409,6 +547,8 @@ public static class WorkflowApiExtensions
             if (target.Role == "agent") await AgentReferralCodes.EnsureAsync(db, target);
             await db.SaveChangesAsync();
             await WorkflowEvents.RecordAsync(db, admin, "Account role or assignment updated", "User", id.ToString(), target.Role);
+            if (previousRole != "agent" && target.Role == "agent")
+                await WorkflowEvents.RecordAsync(db, admin, "Agent role assigned", "User", id.ToString(), "The account can now use the Agent workspace with its existing login.");
             return Results.Json(AdminUserView(target, await db.AgentReferrals.Where(x => x.AgentUserId == target.Id).Select(x => x.Code).SingleOrDefaultAsync()));
         });
 
@@ -669,18 +809,74 @@ public static class WorkflowApiExtensions
             return Results.Json(new { ok = true, status = record.Status });
         });
 
-        // The buyer delivery package: original and processed as separate files plus metadata.
+        // Approved work is packaged on demand, including text and metadata, and then retained on the data volume.
         app.MapGet("/api/submissions/{id:int}/delivery", async (int id, HttpRequest request, EldfDbContext db, AudioStoragePaths paths) =>
         {
             var admin = await SessionAuth.CurrentUser(request, db);
             if (admin is null) return Problem(401, "Please sign in to continue.");
             if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
-            var record = await db.AudioProcessing.AsNoTracking().SingleOrDefaultAsync(x => x.SubmissionId == id);
-            if (record is null || record.DeliveryZipPath.Length == 0) return Problem(404, "No delivery package has been built for this work yet.");
-            var full = paths.Resolve(record.DeliveryZipPath);
-            if (full is null || !File.Exists(full)) return Problem(404, "The delivery package is not available on the server.");
+            var submission = await db.Submissions.Include(x => x.User).SingleOrDefaultAsync(x => x.Id == id && x.Status == "Approved");
+            if (submission is null) return Problem(404, "Approved work was not found.");
+            var record = await db.AudioProcessing.SingleOrDefaultAsync(x => x.SubmissionId == id);
+            string full;
+            try { full = await SubmissionDeliveryPackage.EnsureAsync(submission, record, paths, request.HttpContext.RequestAborted); }
+            catch (FileNotFoundException) { return Problem(404, "The original audio file is not available on the server."); }
+            if (record is not null)
+            {
+                record.DeliveryZipPath = paths.ToRelative(full);
+                await db.SaveChangesAsync();
+            }
             await WorkflowEvents.RecordAsync(db, admin, "Delivery package downloaded", "Submission", id.ToString());
-            return Results.File(full, "application/zip", $"ELDF_SUBMISSION_{id}.zip");
+            return Results.File(full, "application/zip", Path.GetFileName(full));
+        });
+
+        app.MapGet("/api/admin/dataset-export", async (HttpRequest request, EldfDbContext db, AudioStoragePaths paths) =>
+        {
+            var admin = await SessionAuth.CurrentUser(request, db);
+            if (admin is null) return Problem(401, "Please sign in to continue.");
+            if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
+            var values = request.Query["ids"].ToString().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (values.Length is < 1 or > 100 || values.Any(value => !int.TryParse(value, out var parsed) || parsed <= 0))
+                return Problem(422, "Select between 1 and 100 approved submissions for export.");
+            var ids = values.Select(int.Parse).Distinct().ToArray();
+            if (ids.Length != values.Length) return Problem(422, "Each submission can appear only once in an export.");
+            var submissions = await db.Submissions.AsNoTracking().Include(x => x.User)
+                .Where(x => ids.Contains(x.Id) && x.Status == "Approved").ToListAsync();
+            if (submissions.Count != ids.Length) return Problem(404, "One or more selected approved submissions were not found.");
+
+            var packages = new List<(string Name, string Path)>();
+            foreach (var submission in submissions)
+            {
+                var processing = await db.AudioProcessing.SingleOrDefaultAsync(x => x.SubmissionId == submission.Id);
+                string packagePath;
+                try { packagePath = await SubmissionDeliveryPackage.EnsureAsync(submission, processing, paths, request.HttpContext.RequestAborted); }
+                catch (FileNotFoundException) { return Problem(404, $"The original audio for submission {submission.Id} is not available."); }
+                if (processing is not null && processing.DeliveryZipPath != paths.ToRelative(packagePath))
+                {
+                    processing.DeliveryZipPath = paths.ToRelative(packagePath);
+                    await db.SaveChangesAsync();
+                }
+                var code = SubmissionPackageNames.Create(submission.User.FullName, submission.Id);
+                packages.Add(($"{code}.zip", packagePath));
+            }
+            await WorkflowEvents.RecordAsync(db, admin, "Bulk dataset export downloaded", "Dataset", "approved", $"{packages.Count} approved packages");
+            return Results.Stream(async output =>
+            {
+                using var archive = new ZipArchive(output, ZipArchiveMode.Create, leaveOpen: true);
+                foreach (var package in packages)
+                {
+                    await using var source = File.OpenRead(package.Path);
+                    using var packageArchive = new ZipArchive(source, ZipArchiveMode.Read, leaveOpen: true);
+                    foreach (var packageEntry in packageArchive.Entries)
+                    {
+                        var path = $"{Path.GetFileNameWithoutExtension(package.Name)}/{packageEntry.FullName}";
+                        var entry = archive.CreateEntry(path, CompressionLevel.NoCompression);
+                        await using var entryStream = entry.Open();
+                        await using var packageEntryStream = packageEntry.Open();
+                        await packageEntryStream.CopyToAsync(entryStream, request.HttpContext.RequestAborted);
+                    }
+                }
+            }, "application/zip", "AfriLisan-approved-dataset.zip");
         });
 
         app.MapGet("/api/admin/events", async (HttpRequest request, EldfDbContext db) =>
@@ -723,9 +919,11 @@ public static class WorkflowApiExtensions
         return events.GroupBy(x => x.SubmissionId).ToDictionary(g => g.Key, g => g.Select(x => (object)new { id = x.Id, role = x.ReviewerRole, decision = x.Decision, comment = x.Comment, createdAt = x.CreatedAtUtc }).ToList());
     }
 
-    private static object SubmissionView(WorkSubmission submission, List<object> history) => new
+    private static object SubmissionView(WorkSubmission submission, List<object> history, bool hasDeliveryPackage = false) => new
     {
         id = submission.Id,
+        submissionCode = SubmissionPackageNames.Create(submission.User.FullName, submission.Id),
+        hasDeliveryPackage,
         contributorId = submission.UserAccountId,
         contributorName = submission.User.FullName,
         contributorPhone = submission.User.Phone,
@@ -749,6 +947,10 @@ public static class WorkflowApiExtensions
     private static object DraftView(WorkDraft draft) => new
     {
         id = draft.Id,
+        ownerUserId = draft.UserAccountId,
+        ownerName = draft.User?.FullName ?? "",
+        assignedUserId = draft.AssignedUserAccountId,
+        assignedUserName = draft.AssignedUser?.FullName ?? "",
         language = draft.ProjectLanguage,
         translationLanguage = draft.TranslationLanguage,
         hasAudio = draft.AudioPath.Length > 0,
@@ -757,6 +959,40 @@ public static class WorkflowApiExtensions
         transcript = draft.Transcript,
         translation = draft.Translation,
         speakers = ParseJsonArray(draft.SpeakersJson),
+        recordingType = draft.RecordingType,
+        updatedAt = draft.UpdatedAtUtc
+    };
+
+    private static object AdminDraftView(WorkDraft draft) => new
+    {
+        id = draft.Id,
+        ownerUserId = draft.UserAccountId,
+        ownerName = draft.User.FullName,
+        ownerPhone = draft.User.Phone,
+        assignedUserId = draft.AssignedUserAccountId,
+        assignedUserName = draft.AssignedUser?.FullName ?? "",
+        language = draft.ProjectLanguage,
+        durationSeconds = draft.DurationSeconds,
+        hasAudio = !string.IsNullOrWhiteSpace(draft.AudioPath),
+        hasTranscript = !string.IsNullOrWhiteSpace(draft.Transcript),
+        hasTranslation = !string.IsNullOrWhiteSpace(draft.Translation),
+        updatedAt = draft.UpdatedAtUtc
+    };
+
+    private static object DraftResumeView(WorkDraft draft, List<string> speakerIds, Dictionary<string, bool> consentBySpeaker) => new
+    {
+        id = draft.Id,
+        ownerUserId = draft.UserAccountId,
+        ownerName = draft.User?.FullName ?? "",
+        assignedUserId = draft.AssignedUserAccountId,
+        language = draft.ProjectLanguage,
+        translationLanguage = draft.TranslationLanguage,
+        hasAudio = !string.IsNullOrWhiteSpace(draft.AudioPath),
+        audioUrl = draft.AudioPath.Length > 0 ? $"/api/drafts/{draft.Id}/audio" : null,
+        durationSeconds = draft.DurationSeconds,
+        transcript = draft.Transcript,
+        translation = draft.Translation,
+        speakers = speakerIds.Select(id => new { speakerId = id, coreConsent = consentBySpeaker.GetValueOrDefault(id) }).ToList(),
         recordingType = draft.RecordingType,
         updatedAt = draft.UpdatedAtUtc
     };
@@ -881,6 +1117,29 @@ public static class WorkflowApiExtensions
         if (path is not null && File.Exists(path)) File.Delete(path);
     }
 
+    private static async Task RunProcessForDrafts(string executable, List<string> arguments)
+    {
+        try
+        {
+            using var process = new Process { StartInfo = new ProcessStartInfo
+            {
+                FileName = executable, RedirectStandardError = true, RedirectStandardOutput = true,
+                UseShellExecute = false, CreateNoWindow = true
+            } };
+            foreach (var argument in arguments) process.StartInfo.ArgumentList.Add(argument);
+            process.Start();
+            var stderr = process.StandardError.ReadToEndAsync();
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            await process.WaitForExitAsync();
+            await Task.WhenAll(stderr, stdout);
+            if (process.ExitCode != 0) throw new InvalidOperationException("The recording parts could not be combined. Keep the local draft and try again.");
+        }
+        catch (System.ComponentModel.Win32Exception)
+        {
+            throw new InvalidOperationException("The server audio tool is unavailable. The browser still has the local draft.");
+        }
+    }
+
     private static string SafeExtension(string fileName)
     {
         var ext = Path.GetExtension(Path.GetFileName(fileName)).ToLowerInvariant();
@@ -904,6 +1163,8 @@ public sealed record AgentTicketUpdateInput(bool? Escalate);
 public sealed record PaymentRequestInput(decimal Amount);
 public sealed record PasswordResetRequestInput(string? Phone);
 public sealed record PasswordChangeInput(string? CurrentPassword, string? NewPassword);
+public sealed record AdminProfileUpdateInput(string? FullName, string? Phone, string? CurrentPassword);
+public sealed record AdminDraftAssignmentInput(int? AssignedUserId);
 public sealed record PaymentDecisionInput(string? Decision, string? Note);
 public sealed record AdminPaymentDecisionInput(string? Decision, string? Note, string? ProofReference);
 public sealed record SiteContentInput(string? VisionAm, string? VisionEn, string? MissionAm, string? MissionEn);

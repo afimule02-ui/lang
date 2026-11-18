@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 
 @Injectable({ providedIn: 'root' })
 export class ApiService {
@@ -32,8 +32,50 @@ export class ApiService {
     }));
   }
 
+  updateAdminProfile(profile: { name: string; phone: string; currentPassword: string }) {
+    return firstValueFrom(this.http.patch<{ user: { id: number; name: string; phone: string; role: 'admin'; language: string } }>(`${this.API}/auth/admin-profile`, {
+      fullName: profile.name, phone: profile.phone, currentPassword: profile.currentPassword
+    }, { withCredentials: true }));
+  }
+
+  reassignDraft(id: number, assignedUserId: number | null) {
+    return firstValueFrom(this.http.patch(`${this.API}/admin/drafts/${id}/assignment`, { assignedUserId }, { withCredentials: true }));
+  }
+
+  getDraft<T = Record<string, any>>(id: number) {
+    return firstValueFrom(this.http.get<T>(`${this.API}/drafts/${id}`, { withCredentials: true }));
+  }
+
+  getDraftAudio(id: number) {
+    return firstValueFrom(this.http.get(`${this.API}/drafts/${id}/audio`, { withCredentials: true, responseType: 'blob' }));
+  }
+
+  saveDraft(form: FormData) {
+    return firstValueFrom(this.http.post<{ id: number }>(`${this.API}/drafts`, form, { withCredentials: true }).pipe(timeout({ first: 30_000 })));
+  }
+
+  deleteDraft(id: number) {
+    return firstValueFrom(this.http.delete(`${this.API}/drafts/${id}`, { withCredentials: true }));
+  }
+
   requestPayment(amount: number) {
     return firstValueFrom(this.http.post(`${this.API}/payments/requests`, { amount }, { withCredentials: true }));
+  }
+
+  createSupportTicket(subject: string, message: string) {
+    return firstValueFrom(this.http.post(`${this.API}/support/tickets`, { subject, message }, { withCredentials: true }));
+  }
+
+  sendSupportMessage(id: number, message: string) {
+    return firstValueFrom(this.http.post(`${this.API}/support/tickets/${id}/messages`, { message }, { withCredentials: true }));
+  }
+
+  updateSupportTicket(id: number, update: { status: string; assignedAgentId?: number }) {
+    return firstValueFrom(this.http.patch(`${this.API}/support/tickets/${id}`, update, { withCredentials: true }));
+  }
+
+  escalateSupportTicket(id: number) {
+    return firstValueFrom(this.http.patch(`${this.API}/support/tickets/${id}`, { escalate: true }, { withCredentials: true }));
   }
 
   requestPasswordReset(phone: string) {
@@ -57,7 +99,21 @@ export class ApiService {
   }
 
   async saveSpeakers(speakers: any[]) {
-    return firstValueFrom(this.http.post(`${this.API}/speakers`, { speakers }, { withCredentials: true }));
+    return firstValueFrom(this.http.post(`${this.API}/speakers`, { speakers }, { withCredentials: true }).pipe(
+      timeout({ first: 30_000 })
+    ));
+  }
+
+  async getSpeakers<T = any[]>() {
+    return firstValueFrom(this.http.get<T>(`${this.API}/speakers`, { withCredentials: true }));
+  }
+
+  withdrawSpeakerConsent(speakerId: string) {
+    return firstValueFrom(this.http.post(`${this.API}/speakers/${encodeURIComponent(speakerId)}/consent/withdrawal`, {}, { withCredentials: true }));
+  }
+
+  speakerConsents<T = any[]>() {
+    return firstValueFrom(this.http.get<T>(`${this.API}/admin/speaker-consents`, { withCredentials: true }));
   }
 
   async submitAudio(form: FormData) {
