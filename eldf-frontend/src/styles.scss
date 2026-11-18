@@ -26,6 +26,7 @@ a { text-decoration: none; }
   border-right: 1px solid #ffffff14; padding: 24px 15px;
   display: flex; flex-direction: column; z-index: 3; overflow-y: auto;
 }
+.sidebar-backdrop { display: none; }
 .brand { display: flex; gap: 10px; align-items: center; color: white; padding: 0 8px 29px; }
 .brand-mark {
   position: relative; width: 44px; height: 44px; flex: 0 0 44px;
@@ -372,6 +373,7 @@ a { text-decoration: none; }
 @media (max-width: 700px) {
   .sidebar { transform: translateX(-100%); transition: .2s; box-shadow: 0 10px 30px #2233; }
   .sidebar.open { transform: translateX(0); }
+  .sidebar-backdrop { display: block; position: fixed; inset: 0; z-index: 2; border: 0; border-radius: 0; padding: 0; background: #0009; cursor: default; }
   .main-column { margin-left: 0; }
   .topbar { padding: 0 14px; }
   .content { padding: 20px 14px; }

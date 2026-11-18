@@ -121,7 +121,7 @@ const AM: Record<string, string> = {
   'One-person speech': 'የአንድ ሰው ንግግር', 'Speaker ID': 'የተናጋሪ መለያ',
   'Recording Studio': 'የቀረጻ ስቱዲዮ', '30-second microphone test': 'የ30 ሰከንድ የማይክሮፎን ሙከራ',
   'Keep quiet for the first 3 seconds, then speak naturally until the test ends.': 'ለመጀመሪያዎቹ 3 ሰከንዶች ዝም ይበሉ፤ ከዚያ ሙከራው እስኪያልቅ በተፈጥሮ ይናገሩ።',
-  'Start microphone test': 'የማይክሮፎን ሙከራ ጀምር', 'Microphone test in progress': 'የማይክሮፎን ሙከራ በመካሄድ ላይ',
+  'Start microphone test': 'የማይክሮፎን ሙከራ ጀምር', 'Starting microphone test…': 'ማይክሮፎኑን በማገናኘት ላይ…', 'Microphone test in progress': 'የማይክሮፎን ሙከራ በመካሄድ ላይ',
   'Time remaining': 'የቀረው ጊዜ', 'Microphone test results': 'የማይክሮፎን ሙከራ ውጤቶች',
   'Test again': 'እንደገና ሞክር', 'Continue to recording': 'ወደ ቀረጻ ቀጥል',
   'Elapsed test time': 'የሙከራው ያለፈ ጊዜ',

@@ -14,8 +14,8 @@
         <h2>{{ tr.t('30-second microphone test') }}</h2>
         <p>{{ tr.t('Keep quiet for the first 3 seconds, then speak naturally until the test ends.') }}</p>
         @if (state === 'testReady') {
-          <button class="studio-record-button" (click)="startTest()">
-            <span class="studio-record-icon">●</span><span>{{ tr.t('Start microphone test') }}</span>
+          <button class="studio-record-button" type="button" [disabled]="testStarting" (click)="startTest()">
+            <span class="studio-record-icon">●</span><span>{{ tr.t(testStarting ? 'Starting microphone test…' : 'Start microphone test') }}</span>
           </button>
         }
         @if (state === 'testing') {

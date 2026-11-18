@@ -1,4 +1,4 @@
-<div class="app-frame" [class.auth-page]="isAuthPage">
+<div class="app-frame" [class.auth-page]="isAuthPage" (keydown.escape)="closeSidebar()">
   <aside class="sidebar" [class.open]="sidebarOpen">
     <a class="brand" routerLink="/">
       <span class="brand-afri-logo"><img src="/africorpus-ai.svg" alt="AfriLisan AI" /></span>
@@ -48,9 +48,13 @@
     </div>
   </aside>
 
+  @if (sidebarOpen) {
+    <button class="sidebar-backdrop" type="button" aria-label="Close navigation menu" (click)="closeSidebar()"></button>
+  }
+
   <div class="main-column">
     <header class="topbar">
-      <button class="mobile-menu" (click)="sidebarOpen = !sidebarOpen">☰</button>
+      <button class="mobile-menu" type="button" [attr.aria-expanded]="sidebarOpen" aria-label="Toggle navigation menu" (click)="sidebarOpen = !sidebarOpen">☰</button>
       <div class="top-tools">
         <div class="switch">
           <button [class.on]="lang === 'am'" (click)="setLang('am')">አማርኛ</button>

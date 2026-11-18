@@ -36,6 +36,7 @@ export class RecordComponent implements OnInit, OnDestroy {
   private persistQueue: Promise<void> = Promise.resolve();
   private lastServerAudioSyncSeconds = 0;
   recoveredDraft = false;
+  testStarting = false;
 
   constructor(public tr: TranslateService, public capture: CaptureSessionService, private router: Router,
     private route: ActivatedRoute, private changeDetector: ChangeDetectorRef, private auth: AuthService, private api: ApiService) {}
@@ -87,14 +88,21 @@ export class RecordComponent implements OnInit, OnDestroy {
   get test_clock_display() { return this.formatTime(this.testElapsed); }
 
   async startTest() {
+    if (this.testStarting || this.state !== 'testReady') return;
+    this.testStarting = true;
     this.notice = '';
-    if (!this.hasSpeakerConsent()) { this.notice = 'Current consent from each selected speaker is required before recording.'; return; }
+    if (!this.hasSpeakerConsent()) {
+      this.notice = 'Current consent from each selected speaker is required before recording.';
+      this.testStarting = false;
+      return;
+    }
     this.testFeedback = [];
     this.testElapsed = 0;
     this.signalSamples = [];
     const availability = this.microphoneAvailabilityError();
     if (availability) {
       this.notice = availability;
+      this.testStarting = false;
       return;
     }
     try {
@@ -103,22 +111,31 @@ export class RecordComponent implements OnInit, OnDestroy {
       this.cleanupMedia();
       this.state = 'testReady';
       this.notice = this.microphoneError(e);
+    } finally {
+      this.testStarting = false;
+      this.changeDetector.detectChanges();
     }
   }
 
   private async beginCapture(isTest: boolean) {
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: {
-      echoCancellation: false, noiseSuppression: false, autoGainControl: false
-    } });
+    // Start both browser operations directly from the user's click. iOS Safari can
+    // suspend AudioContext if resume() is first called after getUserMedia resolves.
+    const streamRequest = navigator.mediaDevices.getUserMedia({ audio: true });
+    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContextClass) throw new DOMException('Audio analysis is not supported.', 'OperationError');
+    this.audioContext = new AudioContextClass();
+    const resumeRequest = this.audioContext.resume();
+    const [streamResult, contextResult] = await Promise.allSettled([streamRequest, resumeRequest]);
+    if (streamResult.status === 'rejected') throw streamResult.reason;
+    const stream = streamResult.value;
     this.activeStream = stream;
     const audioTracks = stream.getAudioTracks();
     if (!stream.active || !audioTracks.length || audioTracks.some(track => track.readyState !== 'live')) {
       throw new DOMException('No live microphone audio track was acquired.', 'NotReadableError');
     }
-    const AudioContextClass = window.AudioContext;
-    this.audioContext = new AudioContextClass();
-    await this.audioContext.resume();
-    if (this.audioContext.state !== 'running') throw new DOMException('Audio analysis did not start.', 'OperationError');
+    if (contextResult.status === 'rejected' || this.audioContext.state !== 'running') {
+      throw new DOMException('Audio analysis did not start.', 'OperationError');
+    }
     this.analyser = this.audioContext.createAnalyser();
     this.analyser.fftSize = 1024;
     this.audioContext.createMediaStreamSource(stream).connect(this.analyser);
