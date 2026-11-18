@@ -84,7 +84,15 @@ export class CaptureSessionService {
     const chunks = await this.request<StoredAudioChunk[]>(read.objectStore('audioChunks').index('ownerId').getAll(ownerId));
     await this.transactionDone(read);
     if (!draft) {
-      this.clearInMemory();
+      // A fresh speaker/topic setup is held in memory until the first recording
+      // chunk creates a local draft. Do not erase that setup just because this
+      // is the first visit to the recording page.
+      this.activeDraft = null;
+      this.audio = null;
+      this.audioSegments = [];
+      this.audioName = 'recording.webm';
+      this.transcript = '';
+      this.translation = '';
       this.activeOwnerId = ownerId;
       this.savedDrafts.set([]);
       return null;
