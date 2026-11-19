@@ -42,6 +42,10 @@ export class ApiService {
     return firstValueFrom(this.http.patch(`${this.API}/admin/drafts/${id}/assignment`, { assignedUserId }, { withCredentials: true }));
   }
 
+  assignSubmissionReview(id: number, agentId: number | null) {
+    return firstValueFrom(this.http.patch(`${this.API}/admin/submissions/${id}/assignment`, { agentId }, { withCredentials: true }));
+  }
+
   getDraft<T = Record<string, any>>(id: number) {
     return firstValueFrom(this.http.get<T>(`${this.API}/drafts/${id}`, { withCredentials: true }));
   }
@@ -117,7 +121,7 @@ export class ApiService {
   }
 
   async submitAudio(form: FormData) {
-    return firstValueFrom(this.http.post(`${this.API}/submissions`, form, { withCredentials: true }));
+    return firstValueFrom(this.http.post<{ ok: boolean; submissionId: number; status: string }>(`${this.API}/submissions`, form, { withCredentials: true }).pipe(timeout({ first: 15 * 60 * 1000 })));
   }
 
   async deleteSubmission(id: number) {

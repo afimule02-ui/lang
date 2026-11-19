@@ -377,6 +377,7 @@ app.MapPost("/api/submissions", async (HttpRequest request, EldfDbContext db) =>
         File.Move(tempPath, targetPath);
         var draftOwner = draftOwnerId == user.Id ? user : await db.Users.SingleAsync(x => x.Id == draftOwnerId);
         var submission = new WorkSubmission { UserAccountId = draftOwner.Id, AssignedAgentId = draftOwner.ReferredByAgentId, ProjectLanguage = Limit(form["language"], 160), DurationSeconds = seconds, AudioPath = Path.GetRelativePath(dataDirectory, targetPath), Transcript = transcript, Translation = translation, Status = draftOwner.ReferredByAgentId.HasValue ? "Awaiting agent review" : "Awaiting admin review", UpdatedAtUtc = DateTime.UtcNow };
+        submission.TopicTitle = Limit(form["topic_title"], 160);
         db.Submissions.Add(submission);
         await db.SaveChangesAsync();
         await WorkflowEvents.RecordAsync(db, user, "Work submitted", "Submission", submission.Id.ToString(), submission.ProjectLanguage);

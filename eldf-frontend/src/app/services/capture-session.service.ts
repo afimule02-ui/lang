@@ -8,6 +8,7 @@ export interface LocalCaptureDraft {
   language: string;
   speakers: any[];
   topics: string[];
+  topicTitle?: string;
   recordingType: string;
   transcript: string;
   translation: string;
@@ -48,6 +49,7 @@ export class CaptureSessionService {
   speakers: any[] = [];
   recordingType = 'Conversation';
   topics: string[] = [];
+  topicTitle = '';
 
   constructor(private api: ApiService) {}
 
@@ -104,6 +106,7 @@ export class CaptureSessionService {
     sessionStorage.setItem(this.languageKey, draft.language);
     this.speakers = draft.speakers.map(speaker => ({ ...speaker }));
     this.topics = [...draft.topics];
+    this.topicTitle = draft.topicTitle ?? '';
     this.recordingType = draft.recordingType;
     this.transcript = draft.transcript;
     this.translation = draft.translation;
@@ -128,7 +131,7 @@ export class CaptureSessionService {
     const stage: CaptureStage = serverDraft.translation ? 'translation' : serverDraft.transcript ? 'transcription' : 'recording';
     const draft: LocalCaptureDraft = {
       ownerId, serverDraftId: serverDraft.id, language: serverDraft.language ?? '', speakers,
-      topics: [], recordingType: serverDraft.recordingType ?? 'Conversation',
+      topics: [], topicTitle: serverDraft.topicTitle ?? '', recordingType: serverDraft.recordingType ?? 'Conversation',
       transcript: serverDraft.transcript ?? '', translation: serverDraft.translation ?? '', stage,
       elapsedSeconds: serverDraft.durationSeconds ?? 0, chunkCount: audio ? 1 : 0,
       segmentCount: 1, updatedAt: Date.now()
@@ -146,6 +149,7 @@ export class CaptureSessionService {
     sessionStorage.setItem(this.languageKey, draft.language);
     this.speakers = speakers.map((speaker: any) => ({ ...speaker }));
     this.topics = [];
+    this.topicTitle = draft.topicTitle ?? '';
     this.recordingType = draft.recordingType;
     this.transcript = draft.transcript;
     this.translation = draft.translation;
@@ -163,6 +167,7 @@ export class CaptureSessionService {
       language: this.language(),
       speakers: this.speakers.map(speaker => ({ ...speaker })),
       topics: [...this.topics],
+      topicTitle: this.topicTitle,
       recordingType: this.recordingType,
       transcript: this.transcript,
       translation: this.translation,
@@ -200,6 +205,7 @@ export class CaptureSessionService {
     draft.language = this.language();
     draft.speakers = this.speakers.map(speaker => ({ ...speaker }));
     draft.topics = [...this.topics];
+    draft.topicTitle = this.topicTitle;
     draft.recordingType = this.recordingType;
     drafts.put(draft);
     await this.transactionDone(tx);
@@ -220,6 +226,7 @@ export class CaptureSessionService {
       language: this.language(),
       speakers: this.speakers.map(speaker => ({ ...speaker })),
       topics: [...this.topics],
+      topicTitle: this.topicTitle,
       recordingType: this.recordingType,
       stage,
       updatedAt: Date.now()
@@ -236,6 +243,7 @@ export class CaptureSessionService {
     form.append('transcript', this.transcript);
     form.append('translation', this.translation);
     form.append('recording_type', this.recordingType);
+    form.append('topic_title', this.topicTitle);
     form.append('consent_reference', 'speaker-consent-v1');
     form.append('duration_seconds', String(this.activeDraft.elapsedSeconds));
     form.append('speakers_json', JSON.stringify(this.speakers.filter(speaker => speaker.speakerId).map(speaker => speaker.speakerId)));
@@ -349,6 +357,7 @@ export class CaptureSessionService {
     this.speakers = [];
     this.recordingType = 'Conversation';
     this.topics = [];
+    this.topicTitle = '';
     this.activeDraft = null;
     this.activeOwnerId = null;
     this.storageWarning.set('');

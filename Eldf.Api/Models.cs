@@ -70,6 +70,7 @@ public sealed class WorkSubmission
     public int UserAccountId { get; set; }
     public UserAccount User { get; set; } = null!;
     public string ProjectLanguage { get; set; } = "";
+    public string TopicTitle { get; set; } = "";
     public int DurationSeconds { get; set; }
     public string AudioPath { get; set; } = "";
     public string Transcript { get; set; } = "";
@@ -120,6 +121,7 @@ public sealed class WorkDraft
     public int? AssignedUserAccountId { get; set; }
     public UserAccount? AssignedUser { get; set; }
     public string ProjectLanguage { get; set; } = "";
+    public string TopicTitle { get; set; } = "";
     public string TranslationLanguage { get; set; } = "";
     public string AudioPath { get; set; } = "";
     public int DurationSeconds { get; set; }
@@ -307,7 +309,7 @@ public sealed class EldfDbContext(DbContextOptions<EldfDbContext> options) : DbC
         model.Entity<WorkSubmission>(e =>
         {
             e.ToTable("eldf_submissions"); e.Property(x => x.Id).HasColumnName("id"); e.Property(x => x.UserAccountId).HasColumnName("user_id");
-            e.Property(x => x.ProjectLanguage).HasColumnName("project_language").HasMaxLength(160); e.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
+            e.Property(x => x.ProjectLanguage).HasColumnName("project_language").HasMaxLength(160); e.Property(x => x.TopicTitle).HasColumnName("topic_title").HasMaxLength(160); e.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
             e.Property(x => x.AudioPath).HasColumnName("audio_path").HasMaxLength(500); e.Property(x => x.Transcript).HasColumnName("transcript");
             e.Property(x => x.Translation).HasColumnName("translation"); e.Property(x => x.Status).HasColumnName("status").HasMaxLength(40); e.Property(x => x.CreatedAtUtc).HasColumnName("created_at");
             e.Property(x => x.UpdatedAtUtc).HasColumnName("updated_at").HasDefaultValueSql("SYSUTCDATETIME()");
@@ -332,7 +334,7 @@ public sealed class EldfDbContext(DbContextOptions<EldfDbContext> options) : DbC
             e.HasIndex(x => new { x.AssignedUserAccountId, x.UpdatedAtUtc }).HasDatabaseName("IX_eldf_work_drafts_assigned_user_id_updated_at");
             e.Property(x => x.Id).HasColumnName("id"); e.Property(x => x.UserAccountId).HasColumnName("user_id");
             e.Property(x => x.AssignedUserAccountId).HasColumnName("assigned_user_id");
-            e.Property(x => x.ProjectLanguage).HasColumnName("project_language").HasMaxLength(160); e.Property(x => x.TranslationLanguage).HasColumnName("translation_language").HasMaxLength(160);
+            e.Property(x => x.ProjectLanguage).HasColumnName("project_language").HasMaxLength(160); e.Property(x => x.TopicTitle).HasColumnName("topic_title").HasMaxLength(160); e.Property(x => x.TranslationLanguage).HasColumnName("translation_language").HasMaxLength(160);
             e.Property(x => x.AudioPath).HasColumnName("audio_path").HasMaxLength(500); e.Property(x => x.DurationSeconds).HasColumnName("duration_seconds");
             e.Property(x => x.Transcript).HasColumnName("transcript"); e.Property(x => x.Translation).HasColumnName("translation");
             e.Property(x => x.SpeakersJson).HasColumnName("speakers_json"); e.Property(x => x.RecordingType).HasColumnName("recording_type").HasMaxLength(80);

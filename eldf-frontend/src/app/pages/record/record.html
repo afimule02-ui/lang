@@ -88,11 +88,14 @@
               <button class="studio-control-button" (click)="download(segmentUrl, capture.audioSegments[$index]?.type || 'audio/webm', 'recording-part-' + ($index + 1))">{{ tr.t('Download part') }}</button>
             </div>
           }
+          @if (elapsed < 1800) { <p class="form-error" role="status">{{ tr.t('Record at least 30 minutes before continuing to transcription. Your current audio is saved; continue recording or download it.') }}</p> }
           <div class="studio-control-row">
-            @if (recoveredDraft) { <button class="studio-control-button" (click)="continueInterruptedRecording()">{{ tr.t('Continue recording') }}</button> }
+            @if (elapsed < 1800 && elapsed < 3600) { <button class="studio-control-button" (click)="continueInterruptedRecording()">{{ tr.t('Continue recording') }}</button> }
             <button class="studio-control-button" (click)="retryRecording()">{{ tr.t('Record again') }}</button>
           </div>
-          <div class="studio-footer"><button class="primary-button" (click)="proceed()">{{ tr.t('Write transcription') }} →</button></div>
+          @if (elapsed >= 1800 && elapsed <= 3600) {
+            <div class="studio-footer"><button class="primary-button" (click)="proceed()">{{ tr.t('Go to transcription') }} →</button></div>
+          }
         </div>
       }
       @if (state === 'idle' || state === 'done') {

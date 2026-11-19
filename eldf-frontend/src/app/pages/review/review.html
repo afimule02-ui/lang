@@ -7,9 +7,20 @@
 @for (item of pending; track item.id) {
   <section class="workspace-card">
     <div class="page-heading">
-      <div><h2>{{ item.language }} · {{ item.contributorName }}</h2><p>{{ item.durationSeconds / 60 | number:'1.0-0' }} min · {{ item.createdAt }}</p></div>
+      <div><h2>{{ item.topicTitle || item.language }} · {{ item.contributorName }}</h2><p>{{ item.language }} · {{ item.durationSeconds / 60 | number:'1.0-0' }} min · {{ item.createdAt }}</p></div>
       <span class="status-pill">{{ item.status }}</span>
     </div>
+    @if (auth.user()?.role === 'admin') {
+      <div class="entry-actions">
+        <label class="field">{{ tr.t('Assign review task to an agent') }}
+          <select [(ngModel)]="assignedAgents[item.id]" [disabled]="assignmentBusyId === item.id">
+            <option [ngValue]="null">{{ tr.t('Keep in administrator review queue') }}</option>
+            @for (agent of agents; track agent.id) { <option [ngValue]="agent.id">{{ agent.name }}</option> }
+          </select>
+        </label>
+        <button class="secondary-button" [disabled]="assignmentBusyId === item.id" (click)="assign(item)">{{ tr.t(assignmentBusyId === item.id ? 'Assigning…' : 'Send as review task') }}</button>
+      </div>
+    }
     <audio controls [src]="item.audioUrl"></audio>
     <div class="field"><label>{{ tr.t('Transcript') }}</label><p>{{ item.transcript }}</p></div>
     <div class="field"><label>{{ tr.t('Translation') }}</label><p>{{ item.translation }}</p></div>

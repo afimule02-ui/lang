@@ -13,6 +13,8 @@ export interface WorkspaceSubmission {
   transcript: string;
   translation: string;
   status: string;
+  assignedAgentId?: number | null;
+  topicTitle?: string;
   updatedAt: string;
   agentComment: string;
   adminComment: string;
@@ -27,6 +29,7 @@ export interface WorkspaceData {
   drafts?: Array<{
     id: number; ownerUserId: number; ownerName?: string; ownerPhone?: string;
     assignedUserId: number | null; assignedUserName?: string; language: string;
+    topicTitle?: string;
     durationSeconds: number; hasAudio?: boolean; hasTranscript?: boolean; hasTranslation?: boolean;
     audioUrl?: string | null; transcript?: string; translation?: string; speakers?: unknown[];
     recordingType?: string; updatedAt: string;

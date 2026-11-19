@@ -19,6 +19,12 @@ import { CaptureSessionService } from '../../services/capture-session.service';
         </label>
       }
     </div>
+    <div class="field">
+      <label for="custom-topic-title">{{ tr.t('Your own topic or title (optional)') }}</label>
+      <input id="custom-topic-title" name="customTopicTitle" [(ngModel)]="topicTitle" maxlength="160"
+        placeholder="{{ tr.t('Enter a topic for this recording') }}" />
+      <small>{{ topicTitle.length }}/160</small>
+    </div>
     @if (error) { <p class="form-error">{{ tr.t(error) }}</p> }
     <h2 class="topic-heading">{{ tr.t('Recording reminders') }}</h2>
     <ul class="guide-list">
@@ -32,12 +38,14 @@ export class PrepareComponent {
     'Health and wellbeing', 'Farming and animals', 'Travel and places', 'Language and cultural expressions',
     'Hopes for the future', 'Folktales and storytelling', 'Music, art and games'];
   selectedTopics: string[] = [];
+  topicTitle = '';
   error = '';
   tips = ['Choose a quiet room.','Reduce background noise.','Keep the microphone at a consistent distance.',
     'Speak naturally and clearly.','Get consent from everyone recorded.'];
 
   constructor(public tr: TranslateService, private capture: CaptureSessionService, private router: Router) {
     this.selectedTopics = [...this.capture.topics];
+    this.topicTitle = this.capture.topicTitle;
   }
 
   toggleTopic(topic: string, event: Event) {
@@ -48,8 +56,10 @@ export class PrepareComponent {
   }
 
   continue() {
-    if (!this.selectedTopics.length) { this.error = 'Select at least one topic before continuing.'; return; }
-    this.capture.setTopics(this.selectedTopics);
+    const custom = this.topicTitle.trim();
+    if (!this.selectedTopics.length && !custom) { this.error = 'Select a topic or enter your own topic before continuing.'; return; }
+    this.capture.topicTitle = custom;
+    this.capture.setTopics([...new Set([...this.selectedTopics, ...(custom ? [custom] : [])])]);
     this.router.navigate(['/record']);
   }
 }

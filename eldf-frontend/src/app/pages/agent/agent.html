@@ -45,6 +45,6 @@
 <section class="workspace-card">
   <h2>{{ tr.t('Team submissions') }}</h2>
   @for (submission of workspace.data()?.submissions ?? []; track submission.id) {
-    <div class="panel"><strong>{{ submission.language }}</strong> · {{ submission.contributorName }} · {{ submission.status }} <a class="text-button" routerLink="/review">Review →</a></div>
+    <div class="panel"><strong>{{ submission.language }}</strong> · {{ submission.contributorName }} · {{ submission.status }} <a class="text-button" routerLink="/review" [queryParams]="{ returnTo: '/agent' }">Review →</a></div>
   } @empty { @if (!workspace.loading() && !workspace.error()) { <p>No submissions are assigned to your team.</p> } }
 </section>

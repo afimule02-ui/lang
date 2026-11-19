@@ -81,13 +81,23 @@ export class TranslationComponent implements OnInit, OnDestroy {
       form.append('transcript', this.transcript);
       form.append('translation', this.translation);
       form.append('language', language);
+      form.append('topic_title', this.capture.topicTitle);
       if (this.capture.activeDraft?.serverDraftId) form.append('draft_id', String(this.capture.activeDraft.serverDraftId));
       form.append('speakers_json', JSON.stringify(this.capture.speakers.map(s => s.speakerId).filter(Boolean)));
-      await this.api.submitAudio(form);
+      const result = await this.api.submitAudio(form);
+      if (!result?.ok || !Number.isSafeInteger(result.submissionId)) {
+        throw new Error('The server did not confirm that the work was submitted. Your saved draft was kept; retry when the connection is stable.');
+      }
       this.success = true;
-      await this.capture.clear(false);
+      try { await this.capture.clear(false); }
+      catch { this.capture.storageWarning.set('The work was submitted successfully, but this browser could not clear its local draft.'); }
     } catch (e: any) {
-      this.error = e?.error?.detail ?? 'Submission failed.';
+      const status = e?.status;
+      this.error = e?.error?.detail
+        ?? (status === 0 ? 'The server could not be reached. Your saved draft was kept; check your connection and retry.'
+          : status === 413 ? 'The audio upload is larger than the server limit. Your saved draft was kept; contact support before trying again.'
+            : status === 504 || status === 408 ? 'The upload took too long or timed out. Your saved draft was kept; retry with a stable connection.'
+              : e?.message || 'Submission failed. Your saved draft was kept; retry or contact support.');
     } finally {
       this.loading = false;
     }

@@ -325,6 +325,7 @@ public static class WorkflowApiExtensions
             if (id > 0 && draft is null) return Problem(404, "The saved draft was not found.");
             draft ??= new WorkDraft { UserAccountId = user.Id, ProjectLanguage = "" };
             draft.ProjectLanguage = WorkflowEvents.Limit(form["language"], 160);
+            draft.TopicTitle = WorkflowEvents.Limit(form["topic_title"], 160);
             draft.TranslationLanguage = WorkflowEvents.Limit(form["translation_language"], 160);
             draft.Transcript = WorkflowEvents.Limit(form["transcript"], 2_000_000);
             draft.Translation = WorkflowEvents.Limit(form["translation"], 2_000_000);
@@ -519,6 +520,34 @@ public static class WorkflowApiExtensions
             await db.SaveChangesAsync();
             await WorkflowEvents.RecordAsync(db, admin, "Interrupted work reassigned", "Draft", draft.Id.ToString(), draft.AssignedUserAccountId?.ToString() ?? draft.UserAccountId.ToString());
             return Results.Json(new { id = draft.Id, ownerUserId = draft.UserAccountId, assignedUserId = draft.AssignedUserAccountId });
+        });
+
+        app.MapPatch("/api/admin/submissions/{id:int}/assignment", async (int id, HttpRequest request, EldfDbContext db) =>
+        {
+            var admin = await SessionAuth.CurrentUser(request, db);
+            if (admin is null) return Problem(401, "Please sign in to continue.");
+            if (admin.Role != "admin") return Problem(403, "Administrator access is required.");
+            var input = await request.ReadFromJsonAsync<AdminSubmissionAssignmentInput>(JsonOptions);
+            var submission = await db.Submissions.SingleOrDefaultAsync(x => x.Id == id);
+            if (submission is null) return Problem(404, "The submitted work was not found.");
+            if (submission.Status is not ("Awaiting agent review" or "Awaiting admin review" or "Awaiting review"))
+                return Problem(409, "Only work waiting for review can be assigned.");
+            if (input?.AgentId is int agentId)
+            {
+                var agent = await db.Users.SingleOrDefaultAsync(x => x.Id == agentId && x.Role == "agent" && x.IsActive);
+                if (agent is null) return Problem(422, "Choose an active agent to receive this review task.");
+                submission.AssignedAgentId = agent.Id;
+                submission.Status = "Awaiting agent review";
+            }
+            else
+            {
+                submission.AssignedAgentId = null;
+                submission.Status = "Awaiting admin review";
+            }
+            submission.UpdatedAtUtc = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            await WorkflowEvents.RecordAsync(db, admin, "Review task assigned", "Submission", id.ToString(), submission.AssignedAgentId?.ToString() ?? "admin");
+            return Results.Json(new { id = submission.Id, assignedAgentId = submission.AssignedAgentId, status = submission.Status });
         });
 
         app.MapPatch("/api/admin/users/{id:int}", async (int id, HttpRequest request, EldfDbContext db) =>
@@ -928,6 +957,7 @@ public static class WorkflowApiExtensions
         contributorName = submission.User.FullName,
         contributorPhone = submission.User.Phone,
         language = submission.ProjectLanguage,
+        topicTitle = submission.TopicTitle,
         durationSeconds = submission.DurationSeconds,
         audioUrl = $"/api/submissions/{submission.Id}/audio",
         transcript = submission.Transcript,
@@ -952,6 +982,7 @@ public static class WorkflowApiExtensions
         assignedUserId = draft.AssignedUserAccountId,
         assignedUserName = draft.AssignedUser?.FullName ?? "",
         language = draft.ProjectLanguage,
+        topicTitle = draft.TopicTitle,
         translationLanguage = draft.TranslationLanguage,
         hasAudio = draft.AudioPath.Length > 0,
         audioUrl = draft.AudioPath.Length > 0 ? $"/api/drafts/{draft.Id}/audio" : null,
@@ -972,6 +1003,7 @@ public static class WorkflowApiExtensions
         assignedUserId = draft.AssignedUserAccountId,
         assignedUserName = draft.AssignedUser?.FullName ?? "",
         language = draft.ProjectLanguage,
+        topicTitle = draft.TopicTitle,
         durationSeconds = draft.DurationSeconds,
         hasAudio = !string.IsNullOrWhiteSpace(draft.AudioPath),
         hasTranscript = !string.IsNullOrWhiteSpace(draft.Transcript),
@@ -986,6 +1018,7 @@ public static class WorkflowApiExtensions
         ownerName = draft.User?.FullName ?? "",
         assignedUserId = draft.AssignedUserAccountId,
         language = draft.ProjectLanguage,
+        topicTitle = draft.TopicTitle,
         translationLanguage = draft.TranslationLanguage,
         hasAudio = !string.IsNullOrWhiteSpace(draft.AudioPath),
         audioUrl = draft.AudioPath.Length > 0 ? $"/api/drafts/{draft.Id}/audio" : null,
@@ -1165,6 +1198,7 @@ public sealed record PasswordResetRequestInput(string? Phone);
 public sealed record PasswordChangeInput(string? CurrentPassword, string? NewPassword);
 public sealed record AdminProfileUpdateInput(string? FullName, string? Phone, string? CurrentPassword);
 public sealed record AdminDraftAssignmentInput(int? AssignedUserId);
+public sealed record AdminSubmissionAssignmentInput(int? AgentId);
 public sealed record PaymentDecisionInput(string? Decision, string? Note);
 public sealed record AdminPaymentDecisionInput(string? Decision, string? Note, string? ProofReference);
 public sealed record SiteContentInput(string? VisionAm, string? VisionEn, string? MissionAm, string? MissionEn);

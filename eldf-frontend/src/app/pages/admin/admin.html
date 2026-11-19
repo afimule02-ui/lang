@@ -3,7 +3,7 @@
     <div class="eyebrow">ADMINISTRATOR</div>
     <h1>{{ tr.t('Management dashboard') }}</h1>
   </div>
-  <a routerLink="/review" class="secondary-button">{{ tr.t('Review queues') }}</a>
+  <a routerLink="/review" [queryParams]="{ returnTo: '/admin' }" class="secondary-button">{{ tr.t('Review queues') }}</a>
 </div>
 
 @if (workspace.loading()) { <p>{{ tr.t('Loading') }}…</p> }
@@ -32,7 +32,7 @@
   <section class="workspace-card">
     <h2>Quick links</h2>
     <div class="entry-actions" style="gap:10px;display:flex;flex-wrap:wrap;margin-top:12px">
-      <a routerLink="/review" class="secondary-button">{{ tr.t('Review queues') }}</a>
+      <a routerLink="/review" [queryParams]="{ returnTo: '/admin' }" class="secondary-button">{{ tr.t('Review queues') }}</a>
       <a routerLink="/catalog" class="secondary-button">{{ tr.t('Language catalog') }}</a>
     </div>
   </section>
@@ -45,7 +45,7 @@
     @for (draft of workspace.data()?.drafts ?? []; track draft.id) {
       <article class="panel">
         <div class="page-heading">
-          <div><strong>{{ draft.ownerName }}</strong> · {{ draft.ownerPhone }}<p>{{ draft.language }} · {{ draft.durationSeconds / 60 | number:'1.0-0' }} min · {{ draft.updatedAt | date:'short' }}</p></div>
+          <div><strong>{{ draft.ownerName }}</strong> · {{ draft.ownerPhone }}<p>{{ draft.topicTitle || draft.language }} · {{ draft.language }} · {{ draft.durationSeconds / 60 | number:'1.0-0' }} min · {{ draft.updatedAt | date:'short' }}</p></div>
           <span class="status-pill">{{ draft.hasTranslation ? 'Translation' : draft.hasTranscript ? 'Transcription' : draft.hasAudio ? 'Recording saved' : 'Started' }}</span>
         </div>
         <p>Audio: {{ draft.hasAudio ? 'saved' : 'not on server yet' }} · Transcript: {{ draft.hasTranscript ? 'saved' : 'not started' }} · Translation: {{ draft.hasTranslation ? 'saved' : 'not started' }}</p>
