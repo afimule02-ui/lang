@@ -247,7 +247,10 @@ public static class WorkflowApiExtensions
                 });
             }
 
-            var ownSubmissions = await db.Submissions.AsNoTracking().Include(x => x.User).Where(x => x.UserAccountId == user.Id)
+            // Approved recordings are retained for administration and delivery, but are no longer
+            // exposed in the contributor workspace after approval.
+            var ownSubmissions = await db.Submissions.AsNoTracking().Include(x => x.User)
+                .Where(x => x.UserAccountId == user.Id && x.Status != "Approved")
                 .OrderByDescending(x => x.UpdatedAtUtc).Take(500).ToListAsync();
             var ownTickets = await db.SupportTickets.AsNoTracking().Include(x => x.CreatedBy).Include(x => x.Messages).ThenInclude(x => x.User)
                 .Where(x => x.CreatedByUserId == user.Id).OrderByDescending(x => x.UpdatedAtUtc).Take(100).ToListAsync();
@@ -277,6 +280,8 @@ public static class WorkflowApiExtensions
             var submission = await db.Submissions.Include(x => x.User).SingleOrDefaultAsync(x => x.Id == id);
             if (submission is null) return Problem(404, "The recording was not found.");
             if (!CanSeeSubmission(user, submission)) return Problem(403, "You do not have access to this recording.");
+            if (user.Role == "contributor" && submission.UserAccountId == user.Id && submission.Status == "Approved")
+                return Problem(404, "This approved recording is no longer available in the contributor workspace.");
             var fullPath = SafeDataPath(configuration, environment, submission.AudioPath);
             if (fullPath is null || !File.Exists(fullPath)) return Problem(404, "The audio file is not available on the server.");
             return Results.File(fullPath, AudioContentType(fullPath), enableRangeProcessing: true);
@@ -789,6 +794,8 @@ public static class WorkflowApiExtensions
             var submission = await db.Submissions.AsNoTracking().Include(x => x.User).SingleOrDefaultAsync(x => x.Id == id);
             if (submission is null) return Problem(404, "The work was not found.");
             if (!CanSeeSubmission(user, submission)) return Problem(403, "You do not have access to this recording.");
+            if (user.Role == "contributor" && submission.UserAccountId == user.Id && submission.Status == "Approved")
+                return Problem(404, "This approved recording is no longer available in the contributor workspace.");
 
             var record = await db.AudioProcessing.AsNoTracking().SingleOrDefaultAsync(x => x.SubmissionId == id);
             if (record is null) return Results.Json(new { status = "not queued", verdict = "", message = "", messageAm = "" });

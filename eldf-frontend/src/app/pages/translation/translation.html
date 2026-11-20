@@ -3,9 +3,9 @@
 </div>
 
 @if (success) {
-  <div class="status-pill approved">
-    ✅ Your recording, transcript, and translation were submitted for review.
-    <br><a routerLink="/dashboard" style="color:var(--green)">Go to dashboard →</a>
+  <div class="status-pill approved" role="status" aria-live="polite">
+    ✅ {{ tr.t('Your recording, transcript, and translation were sent for review.') }}
+    <br><a routerLink="/dashboard" style="color:var(--green)">{{ tr.t('Go to dashboard') }} →</a>
   </div>
 } @else {
   @if (capture.storageWarning()) { <p class="form-error" role="alert">{{ tr.t(capture.storageWarning()) }}</p> }

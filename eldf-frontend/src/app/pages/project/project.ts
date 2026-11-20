@@ -5,6 +5,7 @@ import { Router } from '@angular/router';
 import { AfricanCountry, AfricanLanguage, LanguageCatalogService } from '../../services/language-catalog.service';
 import { TranslateService } from '../../services/translate.service';
 import { CaptureSessionService } from '../../services/capture-session.service';
+import { AuthService } from '../../services/auth.service';
 
 @Component({
   selector: 'app-project',
@@ -40,7 +41,9 @@ import { CaptureSessionService } from '../../services/capture-session.service';
         @if (selectedCountry) { <div class="field"><span>{{ tr.t('Country or territory') }}</span><p>{{ selectedCountry.name }}</p></div> }
       </div>
       <div class="form-footer">
-        <button type="button" class="primary-button" [disabled]="!selectedLanguage" (click)="continue()">{{ tr.t('Continue') }}</button>
+        <button type="button" class="primary-button" [disabled]="!selectedLanguage || starting" (click)="continue()">
+          {{ starting ? tr.t('Saving started work…') : tr.t('Continue') }}
+        </button>
       </div>
     </section>
   }`
@@ -51,9 +54,10 @@ export class ProjectComponent implements OnInit {
   selectedLanguage = '';
   search = '';
   loading = true;
+  starting = false;
   error = '';
 
-  constructor(public tr: TranslateService, private catalog: LanguageCatalogService, private capture: CaptureSessionService, private router: Router) {}
+  constructor(public tr: TranslateService, private catalog: LanguageCatalogService, private capture: CaptureSessionService, private auth: AuthService, private router: Router) {}
 
   ngOnInit() {
     this.catalog.load().subscribe({
@@ -82,10 +86,27 @@ export class ProjectComponent implements OnInit {
     this.search = '';
   }
 
-  continue() {
-    if (!this.selectedLanguage || !this.selectedCountry) return;
+  async continue() {
+    if (!this.selectedLanguage || !this.selectedCountry || this.starting) return;
+    this.starting = true;
+    this.error = '';
+    try {
+      await this.auth.ready;
+      const user = this.auth.user();
+      if (user) {
+        // A new project must not silently resume the previous recording. Preserve that
+        // unfinished work as a server draft before freeing the browser's single local slot.
+        if (!this.capture.activeDraft) await this.capture.restoreDraft(user.id);
+        await this.capture.parkCurrentDraft();
+      }
+    } catch {
+      this.error = 'Your started work could not be saved safely. It is still in this browser; try again when the connection is stable.';
+      this.starting = false;
+      return;
+    }
     this.capture.setCountry(this.selectedCountry.name);
     this.capture.setLanguage(this.selectedLanguage);
-    this.router.navigate(['/speakers']);
+    await this.router.navigate(['/speakers']);
+    this.starting = false;
   }
 }

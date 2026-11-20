@@ -260,6 +260,15 @@ export class CaptureSessionService {
     return result;
   }
 
+  /** Save the current unfinished work on the server before starting a separate local session. */
+  async parkCurrentDraft() {
+    if (!this.activeDraft) return;
+    await this.syncServerDraft(!!this.audioSegments.length);
+    // Keep the server draft available from the contributor's Started work list, but release
+    // this browser's single active-draft slot so a new recording cannot resume it by accident.
+    await this.clear(false);
+  }
+
   async deleteDraft(ownerId = this.activeOwnerId) {
     if (ownerId === null) return;
     const serverDraftId = this.activeOwnerId === ownerId ? this.activeDraft?.serverDraftId : undefined;
